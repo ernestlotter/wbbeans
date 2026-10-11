@@ -1,0 +1,47 @@
+/* wb.Calendar */
+.wb-cal { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 200px; border: 1px solid var(--wb-line); border-radius: var(--wb-radius); background: var(--wb-panel); font-size: 12.5px; outline: none; overflow: hidden; }
+.wb-cal:focus-visible { box-shadow: 0 0 0 2px color-mix(in srgb, var(--wb-accent) 40%, transparent); }
+.wb-cal-toolbar { display: flex; align-items: center; gap: 4px; padding: 4px 6px; border-bottom: 1px solid var(--wb-line); background: var(--wb-chrome); flex: none; }
+.wb-cal-btn { min-width: 26px; height: 24px; padding: 0 6px; font-size: 13px; }
+.wb-cal-btn.wb-active { background: color-mix(in srgb, var(--wb-accent) 15%, transparent); border-color: var(--wb-accent); }
+.wb-cal-title { font-weight: 600; margin-left: 8px; }
+.wb-cal-spacer { flex: 1; }
+.wb-cal-body { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
+.wb-cal-head, .wb-cal-week, .wb-cal-allday-row { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.wb-cal-wn.wb-cal-head, .wb-cal-wn.wb-cal-week, .wb-cal-wn.wb-cal-allday-row { grid-template-columns: 2.2em repeat(7, minmax(0, 1fr)); }
+.wb-cal-head { flex: none; border-bottom: 1px solid var(--wb-line); background: var(--wb-chrome); }
+.wb-cal-hd { padding: 3px 6px; text-align: center; font-weight: 600; color: var(--wb-fg-2); border-left: 1px solid var(--wb-line); }
+.wb-cal-hd:first-child { border-left: none; }
+.wb-cal-week { flex: 1; min-height: 72px; border-bottom: 1px solid var(--wb-line); }
+.wb-cal-week:last-child { border-bottom: none; }
+.wb-cal-wncell { font-size: 11px; color: var(--wb-fg-2); text-align: center; padding-top: 4px; background: var(--wb-chrome); border-right: 1px solid var(--wb-line); }
+.wb-cal-day { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-left: 1px solid var(--wb-line); padding: 2px 3px; overflow: hidden; cursor: default; }
+.wb-cal-week .wb-cal-day:first-child, .wb-cal-wn .wb-cal-wncell + .wb-cal-day { border-left: none; }
+.wb-cal-other { color: var(--wb-fg-2); background: color-mix(in srgb, var(--wb-chrome) 50%, transparent); }
+.wb-cal-weekend { background: color-mix(in srgb, var(--wb-chrome) 70%, transparent); }
+.wb-cal-today-cell .wb-cal-num { background: var(--wb-accent); color: #fff; border-radius: 50%; }
+.wb-cal-selected { box-shadow: inset 0 0 0 2px var(--wb-accent); }
+.wb-cal-over { background: color-mix(in srgb, var(--wb-accent) 15%, transparent); }
+.wb-cal-num { align-self: flex-end; width: 20px; height: 20px; line-height: 20px; text-align: center; font-weight: 600; flex: none; }
+.wb-cal-entries { display: flex; flex-direction: column; gap: 2px; min-height: 0; overflow: hidden; }
+.wb-cal-entry { --wb-cal-color: var(--wb-accent); display: flex; align-items: center; gap: 4px; padding: 1px 5px; border-radius: 3px; font-size: 12px; white-space: nowrap; overflow: hidden; cursor: pointer; background: color-mix(in srgb, var(--wb-cal-color) 18%, transparent); border-left: 3px solid var(--wb-cal-color); }
+.wb-cal-entry .wb-text { overflow: hidden; text-overflow: ellipsis; }
+.wb-cal-entry .wb-icon { width: 14px; height: 14px; flex: none; }
+.wb-cal-entry.wb-cal-allday { background: var(--wb-cal-color); color: #fff; border-left: none; }
+.wb-cal-entry.wb-cal-cont { border-top-left-radius: 0; border-bottom-left-radius: 0; opacity: .85; }
+.wb-cal-entry.wb-cal-more { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.wb-cal-time { color: var(--wb-fg-2); font-size: 11px; flex: none; }
+.wb-cal-allday .wb-cal-time { color: inherit; }
+.wb-cal-dragging { opacity: .4; }
+/* week view */
+.wb-cal-allday-row { flex: none; min-height: 28px; border-bottom: 1px solid var(--wb-line); }
+.wb-cal-allday-cell { gap: 2px; }
+.wb-cal-grid { flex: 1; min-height: 360px; display: grid; grid-template-columns: 3.4em repeat(7, minmax(0, 1fr)); }
+.wb-cal-wn.wb-cal-grid { grid-template-columns: 3.4em repeat(7, minmax(0, 1fr)); }
+.wb-cal-hours { display: flex; flex-direction: column; background: var(--wb-chrome); border-right: 1px solid var(--wb-line); }
+.wb-cal-hour { flex: 1; font-size: 11px; color: var(--wb-fg-2); text-align: right; padding-right: 4px; border-bottom: 1px solid var(--wb-line); }
+.wb-cal-col { position: relative; display: flex; flex-direction: column; border-left: 1px solid var(--wb-line); min-width: 0; }
+.wb-cal-slot { flex: 1; border-bottom: 1px solid var(--wb-line); }
+.wb-cal-col .wb-cal-entry { position: absolute; left: 2px; right: 2px; flex-direction: column; align-items: stretch; gap: 0; white-space: normal; line-height: 1.25; box-sizing: border-box; }
+.wb-cal-col .wb-cal-entry .wb-cal-time { font-size: 10px; }
+.wb-cal-weekview .wb-cal-body { overflow: auto; }

@@ -1,0 +1,3 @@
+org.webbeans.actions.processor.ActionsAnnotationHandler
+org.webbeans.actions.processor.OptionsAnnotationHandler
+org.webbeans.actions.processor.HelpAnnotationHandler

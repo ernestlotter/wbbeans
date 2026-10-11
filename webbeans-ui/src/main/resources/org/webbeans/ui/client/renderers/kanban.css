@@ -1,0 +1,24 @@
+/* wb.Kanban */
+.wb-kanban { display: flex; gap: 10px; flex: 1; min-width: 0; min-height: 160px; padding: 8px; overflow: auto; background: var(--wb-bg); outline: none; align-items: flex-start; }
+.wb-kanban:focus-visible { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--wb-accent) 40%, transparent); }
+.wb-kb-col { --wb-kb-color: var(--wb-fg-2); display: flex; flex-direction: column; flex: 1 0 200px; max-width: 320px; min-width: 180px; max-height: 100%; background: var(--wb-chrome); border: 1px solid var(--wb-line); border-radius: var(--wb-radius); border-top: 3px solid var(--wb-kb-color); }
+.wb-kb-col.wb-kb-over { background: color-mix(in srgb, var(--wb-accent) 10%, var(--wb-chrome)); }
+.wb-kb-head { display: flex; align-items: center; gap: 6px; padding: 6px 8px; font-weight: 600; font-size: 13px; cursor: pointer; user-select: none; }
+.wb-kb-coltitle { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wb-kb-count { font-size: 11px; color: var(--wb-fg-2); background: var(--wb-panel); border: 1px solid var(--wb-line); border-radius: 10px; padding: 0 7px; }
+.wb-kb-over-limit .wb-kb-count { color: #fff; background: var(--wb-danger); border-color: var(--wb-danger); }
+.wb-kb-cards { display: flex; flex-direction: column; gap: 6px; padding: 0 6px 6px; min-height: 30px; overflow: auto; flex: 1; }
+.wb-kb-collapsed .wb-kb-cards, .wb-kb-collapsed .wb-kb-add { display: none; }
+.wb-kb-collapsed { flex: 0 0 auto; min-width: 0; }
+.wb-kb-card { --wb-kb-color: transparent; background: var(--wb-panel); border: 1px solid var(--wb-line); border-left: 4px solid var(--wb-kb-color); border-radius: var(--wb-radius); padding: 6px 8px; cursor: grab; font-size: 13px; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+.wb-kb-card:hover { border-color: var(--wb-fg-2); }
+.wb-kb-card.wb-selected { outline: 2px solid var(--wb-accent); outline-offset: -1px; }
+.wb-kb-card.wb-kb-dragging { opacity: .35; }
+.wb-kb-card[draggable="false"] { cursor: default; }
+.wb-kb-title { display: flex; align-items: center; gap: 6px; font-weight: 500; }
+.wb-kb-title .wb-icon { width: 16px; height: 16px; flex: none; }
+.wb-kb-sub { color: var(--wb-fg-2); font-size: 12px; margin-top: 2px; }
+.wb-kb-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+.wb-kb-tag { font-size: 11px; padding: 0 6px; border-radius: 9px; background: color-mix(in srgb, var(--wb-accent) 14%, transparent); color: var(--wb-accent); }
+.wb-kb-add { margin: 0 6px 6px; border: 1px dashed var(--wb-line); background: transparent; color: var(--wb-fg-2); border-radius: var(--wb-radius); height: 26px; cursor: pointer; font-size: 15px; }
+.wb-kb-add:hover { color: var(--wb-fg); border-color: var(--wb-fg-2); }

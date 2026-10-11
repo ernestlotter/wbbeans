@@ -1,0 +1,2 @@
+org.webbeans.auth.providers.PropertiesAuthenticationProvider
+#position=1000

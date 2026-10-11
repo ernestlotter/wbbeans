@@ -1,0 +1,18 @@
+/* wb.ImageViewer */
+.wb-imgview { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 160px; border: 1px solid var(--wb-line); border-radius: var(--wb-radius); background: var(--wb-panel); overflow: hidden; outline: none; }
+.wb-imgview:focus-visible { box-shadow: 0 0 0 2px color-mix(in srgb, var(--wb-accent) 40%, transparent); }
+.wb-imgview-toolbar { display: flex; align-items: center; gap: 2px; padding: 3px 4px; border-bottom: 1px solid var(--wb-line); background: var(--wb-chrome); flex: none; }
+.wb-imgview-btn { min-width: 26px; height: 24px; border: 1px solid transparent; border-radius: 3px; background: transparent; color: var(--wb-fg); cursor: pointer; font-size: 13px; padding: 0 6px; }
+.wb-imgview-btn:hover { background: var(--wb-chrome-2); border-color: var(--wb-line); }
+.wb-imgview-info { margin-left: auto; font-size: 11px; color: var(--wb-fg-2); padding-right: 6px; }
+.wb-imgview-stage { flex: 1; min-height: 0; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; cursor: grab; background: var(--wb-bg); }
+.wb-imgview-stage.wb-dragging { cursor: grabbing; }
+.wb-imgview-checker { background: repeating-conic-gradient(#ccc 0 25%, #fff 0 50%) 0 0 / 16px 16px; }
+.wb-imgview-img { max-width: none; transform-origin: center; user-select: none; transition: transform .08s; }
+/* wb.PdfViewer */
+.wb-pdfview { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 200px; border: 1px solid var(--wb-line); border-radius: var(--wb-radius); background: var(--wb-panel); overflow: hidden; }
+.wb-pdfview-toolbar { display: flex; align-items: center; gap: 4px; padding: 3px 6px; border-bottom: 1px solid var(--wb-line); background: var(--wb-chrome); flex: none; }
+.wb-pdfview-name { flex: 1; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wb-pdfview-dl, .wb-pdfview-open { padding: 2px 8px; text-decoration: none; font-size: 13px; }
+.wb-pdfview-frame { flex: 1; border: none; width: 100%; min-height: 0; background: #525659; }
+.wb-pdfview-empty { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--wb-fg-2); }

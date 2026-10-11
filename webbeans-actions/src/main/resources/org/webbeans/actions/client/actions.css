@@ -1,0 +1,115 @@
+/* ---- menu bar and menus ---- */
+.wb-menubar { display: flex; align-items: stretch; height: 28px; padding: 0 4px; background: var(--wb-chrome); border-bottom: 1px solid var(--wb-line); user-select: none; }
+.wb-menubar > .wb-menu { display: flex; align-items: center; gap: 6px; padding: 0 10px; cursor: default; border-radius: var(--wb-radius); position: relative; }
+.wb-menubar > .wb-menu > .wb-menu-arrow { display: none; }
+.wb-menubar > .wb-menu:hover, .wb-menubar > .wb-menu.wb-menu-open { background: var(--wb-chrome-2); }
+.wb-menu.wb-disabled { opacity: .55; }
+.wb-menubar > .wb-menu > .wb-icon:empty { display: none; }
+.wb-menu > .wb-icon img, .wb-menuitem > .wb-icon img, .wb-tbbutton .wb-icon img { width: 16px; height: 16px; display: block; }
+.wb-dropdown { display: none; position: fixed; z-index: 1000; min-width: 180px; max-height: 80vh; overflow-y: auto; padding: 4px 0; background: var(--wb-panel); border: 1px solid var(--wb-line); border-radius: 6px; box-shadow: var(--wb-shadow); user-select: none; }
+.wb-dropdown.wb-dropdown-open { display: block; }
+.wb-menuitem, .wb-dropdown > .wb-menu { display: grid; grid-template-columns: 18px 20px 1fr auto; align-items: center; gap: 4px; padding: 5px 12px 5px 8px; cursor: default; white-space: nowrap; }
+.wb-dropdown > .wb-menu { grid-template-columns: 18px 20px 1fr auto; position: relative; }
+.wb-dropdown > .wb-menu::before { content: ""; }
+.wb-dropdown > .wb-menu > .wb-menu-arrow::after { content: "›"; font-size: 15px; line-height: 1; color: var(--wb-fg-2); padding-left: 12px; }
+.wb-menuitem:hover, .wb-menuitem.wb-menu-focus, .wb-dropdown > .wb-menu:hover, .wb-dropdown > .wb-menu.wb-menu-open, .wb-dropdown > .wb-menu.wb-menu-focus { background: var(--wb-accent); color: var(--wb-accent-fg); }
+.wb-menuitem:hover .wb-menu-acc, .wb-menuitem.wb-menu-focus .wb-menu-acc, .wb-dropdown > .wb-menu:hover .wb-menu-arrow::after { color: inherit; }
+.wb-menuitem.wb-disabled { opacity: .5; }
+.wb-menuitem.wb-disabled:hover { background: transparent; color: inherit; }
+.wb-menu-check { text-align: center; font-size: 12px; }
+.wb-menuitem > .wb-icon { display: block; width: 16px; height: 16px; }
+.wb-menu-acc { color: var(--wb-fg-2); font-size: 11px; padding-left: 20px; }
+.wb-separator { height: 1px; margin: 4px 8px; background: var(--wb-line); }
+.wb-popup { display: contents; }
+
+/* ---- toolbars ---- */
+.wb-toolbarpanel { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; padding: 2px 6px; background: var(--wb-chrome); border-bottom: 1px solid var(--wb-line); }
+.wb-toolbarpanel:empty { display: none; }
+.wb-toolbar { display: flex; align-items: center; gap: 2px; padding: 1px 2px; }
+.wb-toolbar-grip { width: 5px; height: 18px; margin-right: 4px; border-left: 1px dotted var(--wb-fg-2); border-right: 1px dotted var(--wb-fg-2); opacity: .6; }
+.wb-toolbar > .wb-separator { width: 1px; height: 18px; margin: 0 4px; }
+.wb-tbbutton { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 7px; border: 1px solid transparent; border-radius: var(--wb-radius); background: transparent; color: inherit; cursor: pointer; }
+.wb-tbbutton:hover:not([disabled]) { background: var(--wb-chrome-2); border-color: var(--wb-line); }
+.wb-tbbutton.wb-selected { background: var(--wb-accent-soft); border-color: var(--wb-accent); }
+.wb-tbbutton[disabled] { opacity: .45; cursor: default; }
+.wb-tbbutton .wb-icon { display: flex; }
+.wb-tbbutton .wb-text:empty { display: none; }
+
+/* ---- dialogs ---- */
+.wb-dialog-wrap { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 500; }
+.wb-dialog-wrap > * { pointer-events: auto; }
+.wb-dialog-backdrop { position: absolute; inset: 0; background: rgba(28, 37, 48, .35); display: none; }
+.wb-dialog-modal > .wb-dialog-backdrop { display: block; }
+.wb-dialog { position: relative; display: flex; flex-direction: column; min-width: 320px; max-width: 92vw; max-height: 90vh; background: var(--wb-panel); color: var(--wb-fg); border: 1px solid var(--wb-line); border-radius: 8px; box-shadow: var(--wb-shadow); outline: none; }
+.wb-dialog-resizable { resize: both; overflow: auto; }
+.wb-dialog-head { display: flex; align-items: center; padding: 8px 10px 8px 14px; background: var(--wb-chrome); border-bottom: 1px solid var(--wb-line); border-radius: 8px 8px 0 0; cursor: move; user-select: none; }
+.wb-dialog-title { flex: 1; font-weight: 600; }
+.wb-dialog-close, .wb-notif-close { border: none; background: transparent; color: var(--wb-fg-2); font-size: 18px; line-height: 1; width: 24px; height: 24px; border-radius: var(--wb-radius); cursor: pointer; }
+.wb-dialog-close:hover, .wb-notif-close:hover { background: var(--wb-chrome-2); color: var(--wb-fg); }
+.wb-dialog-main { display: flex; flex: 1; min-height: 0; }
+.wb-dialog-side { flex: none; width: 180px; padding: 14px; background: var(--wb-chrome); border-right: 1px solid var(--wb-line); }
+.wb-dialog-body { flex: 1; display: flex; gap: 14px; padding: 16px 18px; overflow: auto; min-width: 0; }
+.wb-dialog-content { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.wb-dialog-content > * { min-width: 0; }
+.wb-dialog-icon { flex: none; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 18px; color: #fff; background: var(--wb-accent); }
+.wb-dialog-icon[data-kind="error"] { background: var(--wb-danger); }
+.wb-dialog-icon[data-kind="warning"] { background: var(--wb-warn); }
+.wb-dialog-icon[data-kind="question"] { background: var(--wb-accent); }
+.wb-dialog-message { white-space: pre-wrap; max-width: 60ch; }
+.wb-dialog-trace textarea { min-height: 140px; }
+.wb-dialog-note { padding: 6px 18px; font-size: 12px; border-top: 1px solid var(--wb-line); }
+.wb-dialog-note[data-kind="error"] { color: var(--wb-danger); }
+.wb-dialog-note[data-kind="warning"] { color: var(--wb-warn); }
+.wb-dialog-note[data-kind="info"] { color: var(--wb-fg-2); }
+.wb-dialog-buttons .wb-dialog-help { margin-right: auto; }
+.wb-dialog-buttons { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--wb-line); background: var(--wb-chrome); border-radius: 0 0 8px 8px; }
+.wb-dialog-shake { animation: wb-shake .3s; }
+@keyframes wb-shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+.wb-wizard-steps ol { margin: 0; padding-left: 20px; }
+.wb-wizard-steps li { padding: 3px 0; color: var(--wb-fg-2); }
+.wb-wizard-steps li.wb-wizard-current { color: var(--wb-fg); font-weight: 600; }
+
+/* ---- notifications ---- */
+.wb-notifications { display: contents; }
+.wb-toasts { position: fixed; right: 14px; bottom: 36px; display: flex; flex-direction: column; gap: 8px; width: 320px; z-index: 600; }
+.wb-notif { background: var(--wb-panel); border: 1px solid var(--wb-line); border-left: 4px solid var(--wb-accent); border-radius: 6px; box-shadow: var(--wb-shadow); padding: 8px 10px; animation: wb-toast-in .2s ease-out; }
+.wb-notif[data-category="warning"] { border-left-color: var(--wb-warn); }
+.wb-notif[data-category="error"] { border-left-color: var(--wb-danger); }
+.wb-notif-clickable { cursor: pointer; }
+.wb-notif-out { opacity: 0; transition: opacity .25s; }
+@keyframes wb-toast-in { from { transform: translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+.wb-notif-head { display: flex; align-items: center; gap: 6px; }
+.wb-notif-icon { width: 16px; height: 16px; }
+.wb-notif-title { flex: 1; font-weight: 600; }
+.wb-notif-details { margin-top: 4px; color: var(--wb-fg-2); white-space: pre-wrap; }
+.wb-notif-time { margin-top: 4px; font-size: 11px; color: var(--wb-fg-2); }
+.wb-notif-drawer { position: fixed; right: 0; top: 0; bottom: 24px; width: 360px; background: var(--wb-panel); border-left: 1px solid var(--wb-line); box-shadow: var(--wb-shadow); z-index: 550; display: flex; flex-direction: column; }
+.wb-notif-drawer-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 14px; font-weight: 600; background: var(--wb-chrome); border-bottom: 1px solid var(--wb-line); }
+.wb-notif-drawer-head > span { flex: 1; }
+.wb-notif-clearall { border: 1px solid var(--wb-line); background: transparent; color: inherit; border-radius: var(--wb-radius); padding: 2px 8px; font-size: 12px; cursor: pointer; }
+.wb-notif-list { flex: 1; overflow: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+.wb-notif-list .wb-notif { box-shadow: none; animation: none; }
+.wb-notif-empty { color: var(--wb-fg-2); text-align: center; padding: 20px; }
+.wb-notif-cell { display: inline-flex; align-items: center; gap: 3px; border: none; background: transparent; color: inherit; cursor: pointer; padding: 0 2px; }
+.wb-notif-cell:hover { color: var(--wb-fg); }
+.wb-notif-count { background: var(--wb-accent); color: var(--wb-accent-fg); border-radius: 999px; min-width: 16px; height: 16px; font-size: 10px; line-height: 16px; text-align: center; padding: 0 4px; }
+
+/* ---- progress cell ---- */
+.wb-progress-cell { position: relative; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; max-width: 320px; }
+.wb-progress-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+.wb-progress-bar { position: relative; display: inline-block; width: 90px; height: 7px; border-radius: 4px; background: var(--wb-chrome-2); overflow: hidden; }
+.wb-progress-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--wb-accent); border-radius: 4px; transition: width .15s; }
+.wb-progress-indeterminate .wb-progress-fill { width: 40% !important; animation: wb-indet 1.2s infinite linear; }
+@keyframes wb-indet { from { left: -40%; } to { left: 100%; } }
+.wb-progress-count { font-size: 10px; color: var(--wb-fg-2); }
+.wb-progress-cancel { border: none; background: transparent; color: var(--wb-fg-2); cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; }
+.wb-progress-cancel:hover { color: var(--wb-danger); }
+.wb-progress-list { position: absolute; right: 0; bottom: 20px; min-width: 280px; background: var(--wb-panel); border: 1px solid var(--wb-line); border-radius: 6px; box-shadow: var(--wb-shadow); padding: 6px; display: flex; flex-direction: column; gap: 6px; z-index: 300; }
+.wb-progress-row { display: flex; align-items: center; gap: 8px; color: var(--wb-fg); }
+.wb-progress-row-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* options dialog */
+.wb-options-strip { border-right: 1px solid var(--wb-line); padding: 6px 6px 6px 0; margin-right: 8px; }
+.wb-options-cat { width: 100%; justify-content: flex-start; text-align: left; color: var(--wb-fg); }
+.wb-options-cat-selected { background: var(--wb-accent-soft); border-radius: var(--wb-radius); }
+.wb-options-title { font-weight: 600; font-size: 14px; margin-bottom: 8px; display: block; }

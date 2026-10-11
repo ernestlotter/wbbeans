@@ -1,0 +1,5 @@
+Manifest-Version: 1.0
+WebBeans-Module: org.webbeans.demo
+WebBeans-Module-Version: 0.1.0
+WebBeans-Module-Display-Name: #CTL_DemoModule
+WebBeans-Module-Public-Packages: -

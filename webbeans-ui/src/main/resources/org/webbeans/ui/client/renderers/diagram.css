@@ -1,0 +1,43 @@
+/* wb.Diagram */
+.wb-diagram { position: relative; flex: 1; min-width: 0; min-height: 200px; border: 1px solid var(--wb-line); border-radius: var(--wb-radius); background: var(--wb-panel); overflow: hidden; outline: none; }
+.wb-diagram:focus-visible { box-shadow: 0 0 0 2px color-mix(in srgb, var(--wb-accent) 40%, transparent); }
+.wb-diagram.wb-diagram-over { box-shadow: inset 0 0 0 2px var(--wb-accent); }
+.wb-diagram-svg { width: 100%; height: 100%; display: block; cursor: default; user-select: none; }
+.wb-diagram-panning .wb-diagram-svg { cursor: grabbing; }
+.wb-diagram-gridline { fill: none; stroke: var(--wb-line); stroke-width: .5; }
+.wb-diagram-node { cursor: grab; }
+.wb-diagram-node.wb-diagram-locked { cursor: default; }
+.wb-diagram-node-shape { fill: var(--wb-chrome); stroke: var(--wb-fg-2); stroke-width: 1.2; }
+.wb-diagram-node.wb-selected .wb-diagram-node-shape { stroke: var(--wb-accent); stroke-width: 2.5; }
+.wb-diagram-node.wb-diagram-target .wb-diagram-node-shape { stroke: var(--wb-ok); stroke-width: 3; }
+.wb-diagram-node-label { fill: var(--wb-fg); font: 13px var(--wb-font); pointer-events: none; }
+.wb-diagram-port { fill: var(--wb-panel); stroke: var(--wb-accent); stroke-width: 1.5; cursor: crosshair; opacity: 0; }
+.wb-diagram-node:hover .wb-diagram-port { opacity: 1; }
+.wb-diagram-edge-hit { fill: none; stroke: transparent; stroke-width: 12; cursor: pointer; }
+.wb-diagram-edge-line { fill: none; stroke: var(--wb-fg-2); stroke-width: 1.5; pointer-events: none; }
+.wb-diagram-edge.wb-selected .wb-diagram-edge-line { stroke: var(--wb-accent); stroke-width: 2.5; }
+.wb-diagram-dashed { stroke-dasharray: 6 4; } .wb-diagram-dotted { stroke-dasharray: 2 3; }
+.wb-diagram-arrowhead { fill: var(--wb-fg-2); }
+.wb-diagram-edge-label { fill: var(--wb-fg-2); font: 11px var(--wb-font); pointer-events: none; }
+.wb-diagram-connecting { stroke: var(--wb-accent); stroke-dasharray: 4 3; }
+.wb-diagram-band { fill: color-mix(in srgb, var(--wb-accent) 12%, transparent); stroke: var(--wb-accent); stroke-width: 1; stroke-dasharray: 4 2; }
+.wb-diagram-zoom { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 2px; background: var(--wb-chrome); border: 1px solid var(--wb-line); border-radius: var(--wb-radius); padding: 2px; }
+.wb-diagram-zbtn { width: 24px; height: 22px; border: none; background: transparent; color: var(--wb-fg); cursor: pointer; border-radius: 3px; font-size: 13px; }
+.wb-diagram-zbtn:hover { background: var(--wb-chrome-2); }
+/* wb.Palette */
+.wb-palette { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; border: 1px solid var(--wb-line); border-radius: var(--wb-radius); background: var(--wb-panel); overflow: hidden; font-size: 12.5px; }
+.wb-palette-filter { padding: 4px; border-bottom: 1px solid var(--wb-line); }
+.wb-palette-filter .wb-input { width: 100%; box-sizing: border-box; }
+.wb-palette-body { flex: 1; overflow: auto; }
+.wb-palette-cat { padding: 4px 8px; font-weight: 600; background: var(--wb-chrome); border-bottom: 1px solid var(--wb-line); cursor: pointer; user-select: none; }
+.wb-palette-cat::before { content: '\25BE'; display: inline-block; width: 14px; color: var(--wb-fg-2); font-size: 11px; }
+.wb-collapsed .wb-palette-cat::before { content: '\25B8'; }
+.wb-collapsed .wb-palette-items { display: none; }
+.wb-palette-items { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px; }
+.wb-palette-item { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border: 1px solid transparent; border-radius: var(--wb-radius); cursor: grab; user-select: none; min-width: 0; }
+.wb-palette-item:hover { background: var(--wb-chrome-2); border-color: var(--wb-line); }
+.wb-palette-item.wb-selected { background: var(--wb-sel); border-color: var(--wb-accent); }
+.wb-palette-items:not(.wb-palette-icons) .wb-palette-item { width: calc(50% - 2px); box-sizing: border-box; }
+.wb-palette-item .wb-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wb-palette-icons .wb-palette-item { padding: 6px; }
+.wb-palette-icons .wb-palette-item .wb-icon { width: 20px; height: 20px; }

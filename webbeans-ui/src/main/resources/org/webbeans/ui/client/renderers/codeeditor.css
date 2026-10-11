@@ -1,0 +1,24 @@
+/* wb.CodeEditor */
+.wb-code { display: flex; min-height: 120px; min-width: 0; flex: 1; border: 1px solid var(--wb-line); border-radius: var(--wb-radius); background: var(--wb-panel); font: 12.5px/1.5 var(--wb-mono); overflow: hidden; position: relative; }
+.wb-code.wb-invalid { border-color: var(--wb-danger); }
+.wb-code-gutter { flex: none; min-width: 2.6em; padding: 6px 0; text-align: right; color: var(--wb-fg-2); background: var(--wb-chrome); border-right: 1px solid var(--wb-line); user-select: none; will-change: transform; }
+.wb-code-ln { padding: 0 8px 0 6px; height: 1.5em; white-space: nowrap; position: relative; }
+.wb-code-ln.wb-current { color: var(--wb-fg); background: var(--wb-chrome-2); }
+.wb-code-ln.wb-ann-error { color: var(--wb-danger); font-weight: 600; } .wb-code-ln.wb-ann-error::before { content: ''; position: absolute; left: 2px; top: .45em; width: 6px; height: 6px; border-radius: 50%; background: var(--wb-danger); }
+.wb-code-ln.wb-ann-warning::before { content: ''; position: absolute; left: 2px; top: .45em; width: 6px; height: 6px; border-radius: 50%; background: var(--wb-warn); }
+.wb-code-ln.wb-ann-info::before, .wb-code-ln.wb-ann-mark::before { content: ''; position: absolute; left: 2px; top: .45em; width: 6px; height: 6px; border-radius: 50%; background: var(--wb-accent); }
+.wb-code-ln.wb-ann-bookmark::before { content: '\25B8'; position: absolute; left: 0; color: var(--wb-accent); }
+.wb-code-scroller { position: relative; flex: 1; min-width: 0; overflow: hidden; }
+.wb-code-layer, .wb-code-input { position: absolute; top: 0; left: 0; margin: 0; padding: 6px 8px; font: inherit; line-height: inherit; white-space: pre; tab-size: 4; box-sizing: border-box; }
+.wb-code-layer { pointer-events: none; min-width: 100%; min-height: 100%; color: var(--wb-fg); will-change: transform; }
+.wb-code-layer::before { content: ''; position: absolute; left: 0; right: 0; top: calc(6px + (var(--wb-code-line, 0) - 1) * 1.5em); height: 1.5em; background: color-mix(in srgb, var(--wb-accent) 10%, transparent); }
+.wb-code-input { width: 100%; height: 100%; resize: none; border: none; outline: none; background: transparent; color: transparent; caret-color: var(--wb-fg); overflow: auto; }
+.wb-code-input::selection { background: color-mix(in srgb, var(--wb-accent) 35%, transparent); }
+.wb-code-input::placeholder { color: var(--wb-fg-2); }
+.wb-code.wb-code-wrap .wb-code-layer, .wb-code.wb-code-wrap .wb-code-input { white-space: pre-wrap; word-break: break-all; }
+.tok-kw { color: #8a3fa0; font-weight: 600; } .tok-str { color: #1f7d3a; } .tok-num { color: #b35c00; } .tok-com { color: var(--wb-fg-2); font-style: italic; }
+.tok-typ { color: #1b6ac9; } .tok-ann { color: #8a6d00; } .tok-tag { color: #1b6ac9; } .tok-attr { color: #8a3fa0; } .tok-key { color: #1b6ac9; } .tok-sel { color: #8a3fa0; }
+.tok-var { color: #b35c00; } .tok-re { color: #1f7d3a; } .tok-ent { color: #b35c00; } .tok-hd { color: #1b6ac9; font-weight: 700; } .tok-op { color: var(--wb-fg-2); } .tok-id { color: inherit; }
+[data-theme="dark"] .tok-kw { color: #d49ae8; } [data-theme="dark"] .tok-str { color: #7fd39a; } [data-theme="dark"] .tok-num, [data-theme="dark"] .tok-var, [data-theme="dark"] .tok-ent { color: #f0a85a; }
+[data-theme="dark"] .tok-typ, [data-theme="dark"] .tok-tag, [data-theme="dark"] .tok-key, [data-theme="dark"] .tok-hd { color: #7fb8ff; } [data-theme="dark"] .tok-attr, [data-theme="dark"] .tok-sel { color: #d49ae8; } [data-theme="dark"] .tok-ann { color: #e3c76a; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tok-kw { color: #d49ae8; } :root:not([data-theme="light"]) .tok-str { color: #7fd39a; } :root:not([data-theme="light"]) .tok-num, :root:not([data-theme="light"]) .tok-var, :root:not([data-theme="light"]) .tok-ent { color: #f0a85a; } :root:not([data-theme="light"]) .tok-typ, :root:not([data-theme="light"]) .tok-tag, :root:not([data-theme="light"]) .tok-key, :root:not([data-theme="light"]) .tok-hd { color: #7fb8ff; } :root:not([data-theme="light"]) .tok-attr, :root:not([data-theme="light"]) .tok-sel { color: #d49ae8; } :root:not([data-theme="light"]) .tok-ann { color: #e3c76a; } }

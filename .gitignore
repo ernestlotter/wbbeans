@@ -1,0 +1,17 @@
+# build output
+build/
+target/
+*/target/
+workbench/*/target/
+# runtime data directories
+data/
+*/data/
+wbdata/
+wbapp/
+# local doc staging
+docs-out/
+# editor / OS
+.idea/
+*.iml
+.vscode/
+.DS_Store

@@ -1,0 +1,11 @@
+/* wb.Scene3D — viewport, label overlay, stats and state overlays. Colours come from the theme tokens. */
+.wb-scene3d { position: relative; width: 100%; height: 100%; min-height: 120px; overflow: hidden; outline: none; background: var(--wb-bg); user-select: none; }
+.wb-scene3d:focus-visible { box-shadow: inset 0 0 0 2px var(--wb-accent); }
+.wb-scene3d-canvas { display: block; width: 100% !important; height: 100% !important; }
+.wb-scene3d-hover .wb-scene3d-canvas { cursor: pointer; }
+.wb-scene3d-dragging .wb-scene3d-canvas { cursor: grabbing; }
+.wb-scene3d-labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.wb-scene3d-label { position: absolute; left: 0; top: 0; white-space: nowrap; font: 12px/1.3 var(--wb-font); color: var(--wb-fg); background: var(--wb-panel); opacity: .92; border: 1px solid var(--wb-line); border-radius: var(--wb-radius); padding: 1px 6px; will-change: transform; }
+.wb-scene3d-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 13px var(--wb-font); color: var(--wb-fg-2); background: var(--wb-bg); pointer-events: none; }
+.wb-scene3d-error { color: var(--wb-danger); }
+.wb-scene3d-stats { position: absolute; left: 6px; bottom: 6px; font: 11px var(--wb-mono); color: var(--wb-fg-2); background: var(--wb-panel); opacity: .9; padding: 2px 6px; border-radius: var(--wb-radius); pointer-events: none; }

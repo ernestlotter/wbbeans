@@ -1,0 +1,38 @@
+/* ---- charts ---- */
+:root { --wb-chart-grid: rgba(28, 37, 48, .09); --wb-chart-axis: var(--wb-line); --wb-chart-tooltip-bg: var(--wb-panel); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --wb-chart-grid: rgba(228, 233, 238, .12); } }
+:root[data-theme="dark"] { --wb-chart-grid: rgba(228, 233, 238, .12); }
+.wb-chart { position: relative; width: 100%; height: 100%; min-height: 120px; overflow: hidden; background: var(--wb-panel); outline: none; user-select: none; }
+.wb-chart:focus-visible { outline: 2px solid var(--wb-accent); outline-offset: -2px; }
+.wb-chart-svg { display: block; width: 100%; height: 100%; font: 11px var(--wb-font); }
+.wb-chart-title { font-size: 14px; font-weight: 600; fill: var(--wb-fg); }
+.wb-chart-subtitle { font-size: 11px; fill: var(--wb-fg-2); }
+.wb-chart-empty { fill: var(--wb-fg-2); }
+.wb-chart-grid line { stroke: var(--wb-chart-grid); stroke-width: 1; shape-rendering: crispEdges; }
+.wb-chart-axis-line { stroke: var(--wb-chart-axis); shape-rendering: crispEdges; }
+.wb-chart-tick { fill: var(--wb-fg-2); font-size: 11px; }
+.wb-chart-axis-title { fill: var(--wb-fg-2); font-size: 11px; font-weight: 600; }
+.wb-chart-label { fill: var(--wb-fg); font-size: 10px; pointer-events: none; }
+.wb-chart-line { stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.wb-chart-area { fill-opacity: .18; }
+.wb-chart-bar { stroke: none; }
+.wb-chart-bar:hover, .wb-chart-slice:hover, .wb-chart-dot:hover { filter: brightness(1.15); }
+.wb-chart-slice { stroke: var(--wb-panel); stroke-width: 1.5; }
+.wb-chart-dot-small { opacity: .9; }
+.wb-chart-selected { stroke: var(--wb-fg); stroke-width: 2; }
+.wb-chart-highlight { stroke: var(--wb-accent); stroke-width: 3; }
+.wb-chart-band { fill-opacity: .12; }
+.wb-chart-marker line { stroke-width: 1; stroke-dasharray: 4 3; }
+.wb-chart-marker-label { font-size: 10px; }
+.wb-chart-crosshair { stroke: var(--wb-fg-2); stroke-width: 1; stroke-dasharray: 3 3; pointer-events: none; }
+.wb-chart-brush { fill: var(--wb-accent); fill-opacity: .15; stroke: var(--wb-accent); stroke-dasharray: 3 2; }
+.wb-chart-legend-item { cursor: pointer; }
+.wb-chart-legend-text { fill: var(--wb-fg); font-size: 11px; }
+.wb-chart-legend-hidden { opacity: .4; }
+.wb-chart-legend-hidden .wb-chart-legend-text { text-decoration: line-through; }
+.wb-chart-tip { position: absolute; z-index: 5; pointer-events: none; background: var(--wb-chart-tooltip-bg); border: 1px solid var(--wb-line); border-radius: 6px; box-shadow: var(--wb-shadow); padding: 6px 8px; font-size: 11px; min-width: 90px; max-width: 260px; }
+.wb-chart-tip-head { font-weight: 600; margin-bottom: 3px; color: var(--wb-fg); }
+.wb-chart-tip-row { display: flex; align-items: center; gap: 6px; line-height: 1.5; }
+.wb-chart-tip-sw { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+.wb-chart-tip-name { color: var(--wb-fg-2); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wb-chart-tip-val { color: var(--wb-fg); font-variant-numeric: tabular-nums; }

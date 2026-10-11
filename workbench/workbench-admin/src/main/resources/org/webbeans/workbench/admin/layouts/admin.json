@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "role": "admin",
+  "active": "FilesTC",
+  "root": {
+    "type": "split", "dir": "col", "sizes": ["*", 200, 160],
+    "children": [
+      {
+        "type": "split", "dir": "row", "sizes": [260, "*"],
+        "children": [
+          {"type": "mode", "name": "explorer", "selected": "FilesTC", "tcs": ["FilesTC", "PartsTC"]},
+          {"type": "mode", "name": "editor", "selected": "DashboardTC", "tcs": ["DashboardTC", "ViewerTC"]}
+        ]
+      },
+      {"type": "mode", "name": "output", "selected": "OutputTC", "tcs": ["OutputTC"]},
+      {"type": "mode", "name": "admin", "selected": "ServerStatusTC", "tcs": ["ServerStatusTC"]}
+    ]
+  },
+  "floating": [], "maximized": null, "minimised": {}, "returnSides": {}, "tcState": {}, "closedTcModes": {}
+}

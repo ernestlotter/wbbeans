@@ -1,0 +1,20 @@
+/* wb.DiffView */
+.wb-diff { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 80px; border: 1px solid var(--wb-line); border-radius: var(--wb-radius); background: var(--wb-panel); font: 12.5px/1.5 var(--wb-mono); overflow: hidden; }
+.wb-diff-head { display: flex; flex: none; border-bottom: 1px solid var(--wb-line); background: var(--wb-chrome); font: 600 12px/1.4 var(--wb-font); }
+.wb-diff-title { flex: 1; min-width: 0; padding: 4px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wb-diff-title + .wb-diff-title { border-left: 1px solid var(--wb-line); }
+.wb-diff-body { display: flex; flex: 1; min-height: 0; overflow: auto; }
+.wb-diff-col { flex: 1; min-width: 0; }
+.wb-diff-col + .wb-diff-col { border-left: 1px solid var(--wb-line); }
+.wb-diff-line { display: flex; white-space: pre; min-height: 1.5em; }
+.wb-diff-wrap .wb-diff-line { white-space: pre-wrap; word-break: break-all; }
+.wb-diff-n { flex: none; width: 3.2em; padding-right: 6px; text-align: right; color: var(--wb-fg-2); user-select: none; background: var(--wb-chrome); border-right: 1px solid var(--wb-line); }
+.wb-diff-nonum .wb-diff-n { display: none; }
+.wb-diff-m { flex: none; width: 1.2em; text-align: center; color: var(--wb-fg-2); user-select: none; }
+.wb-diff-t { flex: 1; min-width: 0; padding-right: 8px; }
+.wb-diff-del { background: color-mix(in srgb, var(--wb-danger) 14%, transparent); } .wb-diff-del .wb-diff-m { color: var(--wb-danger); }
+.wb-diff-add { background: color-mix(in srgb, var(--wb-ok, #1f7d3a) 16%, transparent); } .wb-diff-add .wb-diff-m { color: var(--wb-ok, #1f7d3a); }
+.wb-diff-pad { background: repeating-linear-gradient(45deg, transparent, transparent 4px, var(--wb-chrome) 4px, var(--wb-chrome) 8px); }
+.wb-diff-fold { padding: 2px 8px; color: var(--wb-accent); background: var(--wb-chrome-2); border-top: 1px dashed var(--wb-line); border-bottom: 1px dashed var(--wb-line); cursor: pointer; font: 12px/1.5 var(--wb-font); user-select: none; }
+.wb-diff-fold:hover { text-decoration: underline; }
+.wb-diff-empty { padding: 12px; color: var(--wb-fg-2); font: 13px/1.4 var(--wb-font); }

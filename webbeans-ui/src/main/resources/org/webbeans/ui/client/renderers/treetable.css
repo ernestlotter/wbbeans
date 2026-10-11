@@ -1,0 +1,7 @@
+/* wb.TreeTable */
+.wb-tt-indent { flex: none; display: inline-block; }
+.wb-tt-toggle { flex: none; width: 16px; text-align: center; color: var(--wb-fg-2); font-size: 11px; cursor: pointer; user-select: none; }
+.wb-tt-toggle.wb-tt-open::before { content: '\25BE'; }
+.wb-tt-toggle.wb-tt-closed::before { content: '\25B8'; }
+.wb-tt-toggle.wb-tt-leaf { cursor: default; }
+.wb-tt-toggle:hover { color: var(--wb-fg); }

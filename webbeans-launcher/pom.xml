@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>org.webbeans</groupId>
+    <artifactId>webbeans-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>webbeans-launcher</artifactId>
+  <name>WebBeans Launcher</name>
+  <description>Command line entry point: starts the platform and the server.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.webbeans</groupId>
+      <artifactId>webbeans-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.webbeans</groupId>
+      <artifactId>webbeans-auth</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.webbeans</groupId>
+      <artifactId>webbeans-server</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.webbeans</groupId>
+      <artifactId>webbeans-windows</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.webbeans</groupId>
+      <artifactId>webbeans-nodes</artifactId>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <configuration>
+          <archive>
+            <manifest>
+              <mainClass>org.webbeans.launcher.Main</mainClass>
+              <addClasspath>true</addClasspath>
+              <classpathPrefix>lib/</classpathPrefix>
+            </manifest>
+          </archive>
+        </configuration>
+      </plugin>
+      <!-- target/dist: lib/ with the platform jars, modules/ for module jars; run with
+           java -jar target/dist/webbeans-launcher.jar -\-modules target/dist/modules -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>3.6.1</version>
+        <executions>
+          <execution>
+            <id>copy-platform</id>
+            <phase>package</phase>
+            <goals><goal>copy-dependencies</goal></goals>
+            <configuration>
+              <outputDirectory>${project.build.directory}/dist/lib</outputDirectory>
+              <includeScope>runtime</includeScope>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>
