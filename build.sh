@@ -60,6 +60,21 @@ JETTY_CP=$(for j in $JETTY_JARS; do printf '%s:' "$LIB/$j"; done); JETTY_CP="${J
 JETTY_CLIENT_CP="$LIB/jetty-xml-$JETTY_VERSION.jar:$LIB/jetty-client-$JETTY_VERSION.jar:$LIB/websocket-client-$JETTY_VERSION.jar"
 JAVAC="$JAVAC_BIN $TARGET_FLAGS -Xlint:$LINT -Werror -encoding UTF-8"
 
+# The third-party jars: fetched by tools/fetch-third-party.sh on the first build (or whenever one is missing).
+missing_jars() { for p in $(echo "$CP_BASE:$CP_TEST:$JETTY_CP:$JETTY_CLIENT_CP" | tr ':' ' '); do [ -f "$p" ] || basename "$p"; done; }
+MISSING=$(missing_jars)
+if [ -n "$MISSING" ]; then
+  echo "== fetching third-party jars into $LIB ($(echo $MISSING | wc -w) missing)"
+  LIB="$LIB" JETTY_VERSION="$JETTY_VERSION" bash tools/fetch-third-party.sh || true
+  MISSING=$(missing_jars)
+  if [ -n "$MISSING" ]; then
+    echo "build.sh: these jars are missing from $LIB and could not be downloaded:" >&2
+    echo "$MISSING" | sed 's/^/  /' >&2
+    echo "Run tools/fetch-third-party.sh with access to Maven Central, or copy the jars there (LIB=<dir> overrides the directory)." >&2
+    exit 2
+  fi
+fi
+
 build_module() {   # name  classpath  extra-javac-flags
   local name=$1 cp=$2 flags=${3:-}
   local src="$name/src/main/java" res="$name/src/main/resources" out="$OUT/$name/classes"
