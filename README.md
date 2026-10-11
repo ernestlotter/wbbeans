@@ -50,7 +50,9 @@ java -jar webbeans-launcher/target/dist/webbeans-launcher.jar --modules webbeans
 Offline build used during development (compiles with `javac --release 8` against jars in `../third_party/lib`
 and runs the JUnit tests): `./build.sh`. `tools/fetch-third-party.sh` downloads the jars it needs (NetBeans
 lookup/util, JUnit, the Servlet API, Jetty and its WebSocket modules) from Maven Central into that directory.
-It leaves a runnable layout in `build/dist`:
+The JDK is taken from the `PATH`, or from `JAVA_HOME` / `./build.sh --jdk /path/to/jdk` (any JDK 8+ with
+`--release 8` support; `LIB` and `OUT` override the jar and output directories). It leaves a runnable layout
+in `build/dist`:
 
 ```
 java -cp 'build/dist/lib/*' org.webbeans.launcher.Main --modules build/dist/modules --datadir data --port 8080

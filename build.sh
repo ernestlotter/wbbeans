@@ -2,8 +2,39 @@
 # Offline build for environments without Maven Central access.
 # Compiles every module with javac --release 8 against the jars in $LIB and runs the JUnit tests.
 # The canonical build is `mvn verify`; this script mirrors it module by module.
+#
+# Usage: build.sh [--jdk <path>]
+#   --jdk <path>   the JDK to build with (its bin/ must hold javac, jar and java); the same as
+#                  setting JAVA_HOME. Without either, the tools are taken from the PATH.
+# Environment:  JAVA_HOME (JDK), LIB (third-party jars), OUT (build output), JETTY_VERSION.
 set -euo pipefail
 cd "$(dirname "$0")"
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --jdk)   [ $# -ge 2 ] || { echo "build.sh: --jdk needs a path" >&2; exit 2; }; JAVA_HOME="$2"; shift 2 ;;
+    --jdk=*) JAVA_HOME="${1#--jdk=}"; shift ;;
+    -h|--help) sed -n '2,/^set -euo/p' "$0" | grep '^#' | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "build.sh: unknown option $1 (try --help)" >&2; exit 2 ;;
+  esac
+done
+
+# The JDK: $JAVA_HOME/bin when JAVA_HOME (or --jdk) is given, else whatever is on the PATH.
+if [ -n "${JAVA_HOME:-}" ]; then
+  JDK_BIN="${JAVA_HOME%/}/bin"
+  for t in javac jar java; do
+    [ -x "$JDK_BIN/$t" ] || { echo "build.sh: $JDK_BIN/$t not found or not executable (JAVA_HOME=$JAVA_HOME)" >&2; exit 2; }
+  done
+  JAVAC_BIN="$JDK_BIN/javac"; JAR_BIN="$JDK_BIN/jar"; JAVA_BIN="$JDK_BIN/java"
+  export JAVA_HOME
+else
+  for t in javac jar java; do
+    command -v "$t" >/dev/null 2>&1 || { echo "build.sh: $t not on the PATH; set JAVA_HOME or pass --jdk <path>" >&2; exit 2; }
+  done
+  JAVAC_BIN=javac; JAR_BIN=jar; JAVA_BIN=java
+fi
+echo "== JDK: $("$JAVAC_BIN" -version 2>&1 | grep -v '^Picked up') ($(command -v "$JAVAC_BIN"))"
+
 LIB="${LIB:-$(pwd)/../third_party/lib}"
 OUT="${OUT:-$(pwd)/build}"
 CP_BASE="$LIB/org-openide-util-lookup.jar:$LIB/org-openide-util.jar"
@@ -15,7 +46,7 @@ for j in jetty-util jetty-jmx jetty-io jetty-http jetty-server jetty-security je
 JETTY_CP=$(for j in $JETTY_JARS; do printf '%s:' "$LIB/$j"; done); JETTY_CP="${JETTY_CP%:}"
 # the Jetty WebSocket client, used by the server tests only
 JETTY_CLIENT_CP="$LIB/jetty-xml-$JETTY_VERSION.jar:$LIB/jetty-client-$JETTY_VERSION.jar:$LIB/websocket-client-$JETTY_VERSION.jar"
-JAVAC="javac --release 8 -Xlint:all,-options,-processing,-this-escape -Werror -encoding UTF-8"
+JAVAC="$JAVAC_BIN --release 8 -Xlint:all,-options,-processing,-this-escape -Werror -encoding UTF-8"
 
 build_module() {   # name  classpath  extra-javac-flags
   local name=$1 cp=$2 flags=${3:-}
@@ -29,9 +60,9 @@ build_module() {   # name  classpath  extra-javac-flags
   # shellcheck disable=SC2086
   $JAVAC $flags -sourcepath "$src" -cp "$cp" -d "$out" -s "$gen" $(find "$src" -name '*.java')
   if [ -f "$res/META-INF/MANIFEST.MF" ]; then
-    (cd "$out" && jar cfm "$OUT/$name.jar" META-INF/MANIFEST.MF .)
+    (cd "$out" && "$JAR_BIN" cfm "$OUT/$name.jar" META-INF/MANIFEST.MF .)
   else
-    (cd "$out" && jar cf "$OUT/$name.jar" .)
+    (cd "$out" && "$JAR_BIN" cf "$OUT/$name.jar" .)
   fi
 }
 
@@ -48,7 +79,7 @@ test_module() {    # name  classpath  extra-javac-flags
   tests=$(cd "$src" && find . -name '*Test.java' | sed 's#^\./##; s#\.java$##; s#/#.#g' | sort | tr '\n' ' ')
   echo "== running tests of $name"
   # shellcheck disable=SC2086
-  java -cp "$out:$cp:$CP_TEST" org.junit.runner.JUnitCore $tests
+  "$JAVA_BIN" -cp "$out:$cp:$CP_TEST" org.junit.runner.JUnitCore $tests
 }
 
 CORE_CP="$CP_BASE"
@@ -149,4 +180,4 @@ for m in core auth ui windows actions nodes help charts scene3d test server laun
 cp "$OUT/webbeans-demo.jar" "$OUT/webbeans-tutorial.jar" "$OUT/dist/modules/"
 
 echo "== OK: $(ls "$OUT"/*.jar | xargs -n1 basename | tr '\n' ' ')"
-echo "run:  java -cp '$OUT/dist/lib/*' org.webbeans.launcher.Main --modules $OUT/dist/modules --datadir data --port 8080"
+echo "run:  $JAVA_BIN -cp '$OUT/dist/lib/*' org.webbeans.launcher.Main --modules $OUT/dist/modules --datadir data --port 8080"
