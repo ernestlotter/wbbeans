@@ -149,22 +149,34 @@ public final class RegistrationModel {
          */
         public EntrySpec attrs(String[] keyValues) {
             for (String kv : keyValues) {
-                int eq = kv.indexOf('=');
-                if (eq <= 0) {
-                    error(origin, "Attribute must be key=value: '" + kv + "'");
-                    continue;
-                }
-                String key = kv.substring(0, eq).trim();
-                String value = kv.substring(eq + 1);
-                if (value.equals("true") || value.equals("false")) {
-                    attr(key, Boolean.parseBoolean(value));
-                } else if (value.matches("-?\\d{1,9}")) {
-                    attr(key, Integer.parseInt(value));
-                } else {
-                    attr(key, value);
-                }
+                attr(kv, null, null);
             }
             return this;
+        }
+
+        /** The same for the array attribute {@code name} of {@code annotation}; errors point at the bad entry. */
+        public EntrySpec attrs(AnnotationMirror annotation, String name) {
+            for (AnnotationValue v : values(annotation, name)) {
+                attr(String.valueOf(v.getValue()), annotation, v);
+            }
+            return this;
+        }
+
+        private void attr(String kv, AnnotationMirror annotation, AnnotationValue at) {
+            int eq = kv.indexOf('=');
+            if (eq <= 0) {
+                error(origin, annotation, at, "Attribute must be key=value: '" + kv + "'");
+                return;
+            }
+            String key = kv.substring(0, eq).trim();
+            String value = kv.substring(eq + 1);
+            if (value.equals("true") || value.equals("false")) {
+                attr(key, Boolean.parseBoolean(value));
+            } else if (value.matches("-?\\d{1,9}")) {
+                attr(key, Integer.parseInt(value));
+            } else {
+                attr(key, value);
+            }
         }
 
         /** Base name of the bundle for {@code #KEY} attributes; defaults to {@code <package of origin>.Bundle}. */
@@ -318,6 +330,23 @@ public final class RegistrationModel {
         messager.printMessage(Diagnostic.Kind.ERROR, message, element);
     }
 
+    /**
+     * Reports an error at one value inside an annotation (the offending string of an array attribute, say).
+     * Besides pointing the IDE at the exact spot, this keeps several errors on one element apart: javac 8
+     * reports only the first error per source position, so errors all placed on the element would hide each
+     * other.
+     */
+    public void error(Element element, AnnotationMirror annotation, AnnotationValue value, String message) {
+        errors = true;
+        if (annotation == null) {
+            messager.printMessage(Diagnostic.Kind.ERROR, message, element);
+        } else if (value == null) {
+            messager.printMessage(Diagnostic.Kind.ERROR, message, element, annotation);
+        } else {
+            messager.printMessage(Diagnostic.Kind.ERROR, message, element, annotation, value);
+        }
+    }
+
     public void warning(Element element, String message) {
         messager.printMessage(Diagnostic.Kind.WARNING, message, element);
     }
@@ -373,6 +402,18 @@ public final class RegistrationModel {
         String[] out = new String[list.size()];
         for (int i = 0; i < out.length; i++) {
             out[i] = String.valueOf(((AnnotationValue) list.get(i)).getValue());
+        }
+        return out;
+    }
+
+    /** The elements of an array-valued attribute as annotation values (for precise error positions). */
+    public List<AnnotationValue> values(AnnotationMirror annotation, String name) {
+        AnnotationValue v = value(annotation, name);
+        List<AnnotationValue> out = new ArrayList<AnnotationValue>();
+        if (v != null) {
+            for (Object o : (List<?>) v.getValue()) {
+                out.add((AnnotationValue) o);
+            }
         }
         return out;
     }

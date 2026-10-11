@@ -33,7 +33,19 @@ else
   done
   JAVAC_BIN=javac; JAR_BIN=jar; JAVA_BIN=java
 fi
-echo "== JDK: $("$JAVAC_BIN" -version 2>&1 | grep -v '^Picked up') ($(command -v "$JAVAC_BIN"))"
+JAVAC_VERSION=$("$JAVAC_BIN" -version 2>&1 | grep -v '^Picked up' | head -1)   # "javac 1.8.0_432" or "javac 21.0.1"
+JAVAC_MAJOR=$(echo "$JAVAC_VERSION" | sed -E 's/^javac //; s/^1\.//; s/[^0-9].*$//')
+case "$JAVAC_MAJOR" in ''|*[!0-9]*) echo "build.sh: cannot parse the javac version '$JAVAC_VERSION'" >&2; exit 2 ;; esac
+[ "$JAVAC_MAJOR" -ge 8 ] || { echo "build.sh: JDK 8 or newer required, found $JAVAC_VERSION" >&2; exit 2; }
+echo "== JDK: $JAVAC_VERSION ($(command -v "$JAVAC_BIN"))"
+
+# Java 8 class files and API from any JDK: javac 8 only knows -source/-target (it is the Java 8 API itself);
+# javac 9+ has --release, which also checks the API against the Java 8 signatures.
+if [ "$JAVAC_MAJOR" -ge 9 ]; then TARGET_FLAGS="--release 8"; else TARGET_FLAGS="-source 8 -target 8"; fi
+# Every warning is an error, except the ones that only reflect the build setup. Older javacs reject lint keys
+# they do not know, so each key is added only where it exists.
+LINT="all,-options,-processing"
+[ "$JAVAC_MAJOR" -ge 21 ] && LINT="$LINT,-this-escape"
 
 LIB="${LIB:-$(pwd)/../third_party/lib}"
 OUT="${OUT:-$(pwd)/build}"
@@ -46,7 +58,7 @@ for j in jetty-util jetty-jmx jetty-io jetty-http jetty-server jetty-security je
 JETTY_CP=$(for j in $JETTY_JARS; do printf '%s:' "$LIB/$j"; done); JETTY_CP="${JETTY_CP%:}"
 # the Jetty WebSocket client, used by the server tests only
 JETTY_CLIENT_CP="$LIB/jetty-xml-$JETTY_VERSION.jar:$LIB/jetty-client-$JETTY_VERSION.jar:$LIB/websocket-client-$JETTY_VERSION.jar"
-JAVAC="$JAVAC_BIN --release 8 -Xlint:all,-options,-processing,-this-escape -Werror -encoding UTF-8"
+JAVAC="$JAVAC_BIN $TARGET_FLAGS -Xlint:$LINT -Werror -encoding UTF-8"
 
 build_module() {   # name  classpath  extra-javac-flags
   local name=$1 cp=$2 flags=${3:-}

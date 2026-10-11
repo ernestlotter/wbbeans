@@ -180,11 +180,17 @@ public class WbProcessorTest {
                 "package org.bad;\n"
                 + "@org.webbeans.core.registry.Registration(path = \"X\", name = \"same\")\n"
                 + "public class Dup2 { }\n",
+                // one bad value per annotation: javac 8 reports only the first error per source position, and it
+                // places every value of a single-member annotation written without "value =" at the annotation
                 "org.bad.BadAttr",
                 "package org.bad;\n"
                 + "@org.webbeans.core.registry.Registration(path = \"Y\", attrs = \"novalue\")\n"
-                + "@org.webbeans.core.i18n.Messages({\"not a key=1\", \"novalue\"})\n"
-                + "public class BadAttr { }\n");
+                + "@org.webbeans.core.i18n.Messages({\"not a key=1\"})\n"
+                + "public class BadAttr { }\n",
+                "org.bad.BadLine",
+                "package org.bad;\n"
+                + "@org.webbeans.core.i18n.Messages({\"novalue\"})\n"
+                + "public class BadLine { }\n");
         assertFalse(c.ok);
         List<String> errors = c.errors();
         assertTrue(errors.toString(), contains(errors, "Must be public"));

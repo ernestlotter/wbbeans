@@ -41,7 +41,7 @@ public final class FolderHandler implements AnnotationHandler {
         }
         RegistrationModel.EntrySpec spec = model.folder(path, element)
                 .position(model.integer(a, "position", Integer.MAX_VALUE))
-                .attrs(model.strings(a, "attrs"));
+                .attrs(a, "attrs");
         String dn = model.string(a, "displayName");
         if (dn != null && !dn.isEmpty()) {
             spec.attr("displayName", dn);

@@ -65,7 +65,7 @@ public final class RegistrationHandler implements AnnotationHandler {
             spec.instanceOf(type);
         }
         spec.position(model.integer(a, "position", Integer.MAX_VALUE));
-        spec.attrs(model.strings(a, "attrs"));
+        spec.attrs(a, "attrs");
         spec.roles(model.strings(a, "roles"));
         for (AnnotationMirror ref : model.annotations(a, "references")) {
             String refPath = model.string(ref, "path");

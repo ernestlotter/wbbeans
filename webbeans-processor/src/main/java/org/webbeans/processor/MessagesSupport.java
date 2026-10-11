@@ -17,6 +17,7 @@ import java.util.regex.Pattern;
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.AnnotationMirror;
+import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.Element;
 import javax.tools.Diagnostic;
 import javax.tools.FileObject;
@@ -49,25 +50,26 @@ final class MessagesSupport {
 
     void collect(Element element, AnnotationMirror mirror, RegistrationModel model) {
         String pkg = model.packageOf(element);
-        for (String line : model.strings(mirror, "value")) {
+        for (AnnotationValue at : model.values(mirror, "value")) {
+            String line = String.valueOf(at.getValue());
             if (line.startsWith("#")) {
                 comments(pkg).add(line);
                 continue;
             }
             int eq = line.indexOf('=');
             if (eq <= 0) {
-                model.error(element, "@Messages line must be KEY=value: '" + line + "'");
+                model.error(element, mirror, at, "@Messages line must be KEY=value: '" + line + "'");
                 continue;
             }
             String key = line.substring(0, eq).trim();
             String value = line.substring(eq + 1);
             if (!Literals.isJavaIdentifier(key)) {
-                model.error(element, "@Messages key must be a Java identifier: '" + key + "'");
+                model.error(element, mirror, at, "@Messages key must be a Java identifier: '" + key + "'");
                 continue;
             }
             Set<String> done = generated.get(pkg);
             if (done != null && !done.contains(key)) {
-                model.error(element, "Bundle for package " + pkg + " was already generated in an earlier round; "
+                model.error(element, mirror, at, "Bundle for package " + pkg + " was already generated in an earlier round; "
                         + "@Messages keys for one package must all be visible in the same round");
                 continue;
             }

@@ -76,7 +76,13 @@ final class Compile {
                 "-processorpath", System.getProperty("java.class.path"),
                 "-processor", WbProcessor.class.getName(),
                 "-implicit:class",
-                "-Xlint:-options", "--release", "8"));
+                "-Xlint:-options"));
+        // Java 8 output from whichever JDK runs the tests: javac 8 has no --release flag
+        if (System.getProperty("java.specification.version").startsWith("1.")) {
+            opts.addAll(Arrays.asList("-source", "8", "-target", "8"));
+        } else {
+            opts.addAll(Arrays.asList("--release", "8"));
+        }
         opts.addAll(options);
         StringWriter log = new StringWriter();
         Boolean result = javac.getTask(log, fm, diags, opts, null, fm.getJavaFileObjectsFromFiles(files)).call();
