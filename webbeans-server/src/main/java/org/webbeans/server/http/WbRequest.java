@@ -89,7 +89,11 @@ public final class WbRequest {
         return getHeader("User-Agent");
     }
 
+    /** TLS terminated here, or by a proxy that says so ({@code X-Forwarded-Proto}), or {@code --secure-cookies}. */
     public boolean isHttps() {
+        if (request.isSecure()) {
+            return true;
+        }
         String proto = getHeader("X-Forwarded-Proto");
         return config.isSecureCookies() || "https".equalsIgnoreCase(proto);
     }
@@ -245,6 +249,9 @@ public final class WbRequest {
             response.setHeader("Cache-Control", "no-store");
         }
         response.setHeader("X-Content-Type-Options", "nosniff");
+        if (config.isHsts() && isHttps()) {
+            response.setHeader("Strict-Transport-Security", "max-age=31536000");
+        }
         boolean head = "HEAD".equals(request.getMethod());
         response.setContentLength(bytes.length);
         if (!head && bytes.length > 0) {

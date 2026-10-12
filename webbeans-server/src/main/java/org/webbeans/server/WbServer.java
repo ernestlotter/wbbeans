@@ -7,14 +7,21 @@ import java.util.logging.Logger;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
+import org.eclipse.jetty.http.HttpVersion;
+import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
+import org.eclipse.jetty.server.SecureRequestCustomizer;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
+import org.eclipse.jetty.server.SslConnectionFactory;
+import org.eclipse.jetty.server.handler.HandlerList;
+import org.eclipse.jetty.server.handler.SecuredRedirectHandler;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jetty.util.log.JavaUtilLog;
 import org.eclipse.jetty.util.log.Log;
+import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.webbeans.auth.Principal;
 import org.webbeans.auth.Security;
@@ -36,6 +43,10 @@ import org.webbeans.ui.UISession;
  * <li>everything else — the page, the client bundle, resources, blobs and module pages ({@link AppHandler}).</li>
  * </ul>
  * The {@link org.webbeans.ui.Transport} abstraction keeps the UI runtime independent of the transport in use.
+ * <p>
+ * TLS: with {@link ServerConfig#https} the server terminates HTTPS itself (an {@code https} connector next to, or
+ * instead of, the plain one; {@link ServerConfig#httpsRedirect} sends plain requests over to it; HTTPS responses
+ * carry HSTS). Without it, a TLS-terminating proxy in front works with {@code --trusted-proxy}/{@code --secure-cookies}.
  */
 public final class WbServer {
 
@@ -81,12 +92,31 @@ public final class WbServer {
         return sessions;
     }
 
-    /** The port actually bound (useful with port 0 in tests). */
+    /** The plain HTTP port actually bound (useful with port 0 in tests); -1 when HTTP is disabled. */
     public int getPort() {
         if (server == null) {
-            return config.getPort();
+            return config.isHttpEnabled() ? config.getPort() : -1;
         }
-        return ((ServerConnector) server.getConnectors()[0]).getLocalPort();
+        ServerConnector c = connector("http");
+        return c == null ? -1 : c.getLocalPort();
+    }
+
+    /** The HTTPS port actually bound; -1 when the server does not terminate TLS. */
+    public int getHttpsPort() {
+        if (server == null) {
+            return config.isHttpsEnabled() ? config.getHttpsPort() : -1;
+        }
+        ServerConnector c = connector("https");
+        return c == null ? -1 : c.getLocalPort();
+    }
+
+    private ServerConnector connector(String name) {
+        for (Connector c : server.getConnectors()) {
+            if (c instanceof ServerConnector && name.equals(c.getName())) {
+                return (ServerConnector) c;
+            }
+        }
+        return null;
     }
 
     /** The embedded Jetty server, for applications that add their own handlers or connectors before {@link #start}. */
@@ -105,11 +135,44 @@ public final class WbServer {
         HttpConfiguration http = new HttpConfiguration();
         http.setSendServerVersion(false);
         http.setSendDateHeader(true);
-        ServerConnector connector = new ServerConnector(s, new HttpConnectionFactory(http));
-        connector.setHost(config.getHost());
-        connector.setPort(config.getPort());
-        connector.setIdleTimeout(Math.max(60000L, config.getPollWait().toMillis() * 2 + 10000L));
-        s.addConnector(connector);
+        long idle = Math.max(60000L, config.getPollWait().toMillis() * 2 + 10000L);
+        boolean tls = config.isHttpsEnabled();
+        if (tls) {
+            http.setSecureScheme("https");
+            http.setSecurePort(config.getHttpsPort());   // where SecuredRedirectHandler sends plain requests
+        }
+        if (config.isHttpEnabled()) {
+            ServerConnector connector = new ServerConnector(s, new HttpConnectionFactory(http));
+            connector.setName("http");
+            connector.setHost(config.getHost());
+            connector.setPort(config.getPort());
+            connector.setIdleTimeout(idle);
+            s.addConnector(connector);
+        }
+        if (tls) {
+            SslContextFactory.Server ssl = new SslContextFactory.Server();
+            ssl.setKeyStorePath(config.getKeyStore().toAbsolutePath().toString());
+            ssl.setKeyStoreType(config.getKeyStoreType());
+            if (config.getKeyStorePassword() != null) {
+                ssl.setKeyStorePassword(config.getKeyStorePassword());
+            }
+            if (config.getKeyManagerPassword() != null) {
+                ssl.setKeyManagerPassword(config.getKeyManagerPassword());
+            }
+            HttpConfiguration https = new HttpConfiguration(http);
+            // no SNI host check: a certificate that does not match the requested name is for the browser to judge
+            https.addCustomizer(new SecureRequestCustomizer(false));
+            ServerConnector connector = new ServerConnector(s,
+                    new SslConnectionFactory(ssl, HttpVersion.HTTP_1_1.asString()), new HttpConnectionFactory(https));
+            connector.setName("https");
+            connector.setHost(config.getHost());
+            connector.setPort(config.getHttpsPort());
+            connector.setIdleTimeout(idle);
+            s.addConnector(connector);
+        }
+        if (!config.isHttpEnabled() && !tls) {
+            throw new IllegalStateException("Neither HTTP nor HTTPS is enabled");
+        }
 
         String cp = config.getContextPath();
         ServletContextHandler ctx = new ServletContextHandler(ServletContextHandler.NO_SESSIONS);
@@ -124,7 +187,14 @@ public final class WbServer {
         ctx.addServlet(authHolder, "/logout");
         ctx.addServlet(authHolder, "/auth/*");
         ctx.addServlet(new ServletHolder("wb-app", app), "/");
-        s.setHandler(ctx);
+        if (tls && config.isHttpsRedirect() && config.isHttpEnabled()) {
+            HandlerList handlers = new HandlerList();
+            handlers.addHandler(new SecuredRedirectHandler());   // plain requests → https://host:securePort/...
+            handlers.addHandler(ctx);
+            s.setHandler(handlers);
+        } else {
+            s.setHandler(ctx);
+        }
         s.setStopAtShutdown(false);
         s.setStopTimeout(1000);
         return s;
@@ -150,9 +220,19 @@ public final class WbServer {
             Registry.getDefault().removeChangeListener(registryListener);
             throw e instanceof IOException ? (IOException) e : new IOException("Cannot start Jetty: " + e, e);
         }
-        LOG.log(Level.INFO, "WebBeans listening on http://{0}:{1}{2}/ (Jetty {3}, WebSocket {4})", new Object[] {
-            config.getHost(), String.valueOf(getPort()), config.getContextPath(), Server.getVersion(),
-            config.isWebSocketEnabled() ? "on" : "off"});
+        StringBuilder urls = new StringBuilder();
+        if (getPort() >= 0) {
+            urls.append("http://").append(config.getHost()).append(':').append(getPort()).append(config.getContextPath()).append('/');
+            if (config.isHttpsRedirect() && getHttpsPort() >= 0) {
+                urls.append(" (redirecting to HTTPS)");
+            }
+        }
+        if (getHttpsPort() >= 0) {
+            urls.append(urls.length() == 0 ? "" : " and ").append("https://").append(config.getHost()).append(':')
+                .append(getHttpsPort()).append(config.getContextPath()).append('/');
+        }
+        LOG.log(Level.INFO, "WebBeans listening on {0} (Jetty {1}, WebSocket {2})", new Object[] {
+            urls, Server.getVersion(), config.isWebSocketEnabled() ? "on" : "off"});
     }
 
     public synchronized void stop() {

@@ -161,7 +161,7 @@ Every request is `POST /wb/poll` with header `X-WB-Token: <session token>` and a
 - Role checks happen server-side on actions; unauthorised registry entries are never sent (step 1 §4.4). `Security.currentPrincipal()` resolves through `UISession.current()`.
 - Request body / text frame limit 1 MB (`maxPollBody`); pages carry a CSP (`default-src 'self'`, which covers same-origin `ws:`/`wss:` connections in current browsers), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Cache-Control: no-store`; Jetty sends no `Server` header.
 - No component state is trusted from the client except declared client-owned properties.
-- Behind a TLS-terminating proxy the socket is `wss://` from the browser's point of view and plain HTTP between the proxy and Jetty; the proxy must forward the `Upgrade`/`Connection` headers (nginx: `proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade";` with a `proxy_read_timeout` above the 30 s ping interval). `--trusted-proxy` makes `X-Forwarded-For`/`-Proto` believed.
+- TLS: Jetty terminates it itself with `--https-port` + `--keystore` (an `https` connector with `SslContextFactory`; `--https-redirect` adds Jetty's `SecuredRedirectHandler` in front of the context; HTTPS responses carry HSTS and `Secure` cookies; `--https-port` without a key store generates a self-signed certificate for development). Behind a TLS-terminating proxy instead, the socket is `wss://` from the browser's point of view and plain HTTP between the proxy and Jetty; the proxy must forward the `Upgrade`/`Connection` headers (nginx: `proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade";` with a `proxy_read_timeout` above the 30 s ping interval). `--trusted-proxy` makes `X-Forwarded-For`/`-Proto` believed.
 
 ## 8. Client runtime (`wb-core.js`)
 
@@ -205,7 +205,7 @@ Bootstrap: the page contains `window.WB` and `<script src="/wb/app-<hash>.js">`;
 
 - Push notifications when no `UI` is attached — a `NotificationDisplayer` concern (step 5 delivers them to attached UIs).
 - Binary blob frames over the socket (today blobs are fetched with `GET /wb/blob/<sha256>`), `POST /wb/upload`, per-connection send-queue flow control (detach a tab whose socket cannot drain), `GzipHandler` for the bundle — all additions inside `webbeans-server`.
-- HTTP/2 and TLS termination inside Jetty (`--https`): Jetty 9.4 supports both; today TLS is the proxy's job.
+- HTTP/2 inside Jetty: 9.4 supports it (ALPN needs the JDK 9+ ALPN or the `alpn-boot` jar on JDK 8); TLS termination is there (`--https-port`), HTTP/2 is not.
 
 ## 12. Change log
 

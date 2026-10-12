@@ -1,5 +1,6 @@
 package org.webbeans.server;
 
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,6 +26,14 @@ public final class ServerConfig {
     private int httpThreads = Math.max(8, Runtime.getRuntime().availableProcessors() * 4);
     private int backendThreads = Math.max(4, Runtime.getRuntime().availableProcessors() * 2);
     private final List<String> trustedProxies = new ArrayList<String>();
+    private boolean httpEnabled = true;
+    private int httpsPort = -1;
+    private Path keyStore;
+    private String keyStorePassword;
+    private String keyManagerPassword;
+    private String keyStoreType;
+    private boolean httpsRedirect;
+    private boolean hsts = true;
 
     public String getHost() {
         return host;
@@ -197,6 +206,90 @@ public final class ServerConfig {
 
     public ServerConfig trustedProxy(String address) {
         trustedProxies.add(address);
+        return this;
+    }
+
+    // ---- TLS ---------------------------------------------------------------------------------------------------
+
+    /** Whether the plain HTTP connector ({@link #getPort()}) is opened; off for HTTPS-only servers. */
+    public boolean isHttpEnabled() {
+        return httpEnabled;
+    }
+
+    public ServerConfig httpEnabled(boolean b) {
+        this.httpEnabled = b;
+        return this;
+    }
+
+    /** The HTTPS port (0 = a free one), or -1 when the server does not terminate TLS itself (a proxy may still, see {@link #isSecureCookies()}). */
+    public int getHttpsPort() {
+        return httpsPort;
+    }
+
+    public boolean isHttpsEnabled() {
+        return httpsPort >= 0 && keyStore != null;
+    }
+
+    /**
+     * Serves HTTPS on {@code port} with the server certificate from {@code keyStore} (PKCS12 or JKS; the type is
+     * taken from the file name unless {@link #keyStoreType} is set). Port 0 binds a free port.
+     */
+    public ServerConfig https(int port, Path keyStore, String keyStorePassword) {
+        this.httpsPort = port;
+        this.keyStore = keyStore;
+        this.keyStorePassword = keyStorePassword;
+        return this;
+    }
+
+    public Path getKeyStore() {
+        return keyStore;
+    }
+
+    public String getKeyStorePassword() {
+        return keyStorePassword;
+    }
+
+    /** The key's own password when it differs from the store's. */
+    public String getKeyManagerPassword() {
+        return keyManagerPassword;
+    }
+
+    public ServerConfig keyManagerPassword(String pw) {
+        this.keyManagerPassword = pw;
+        return this;
+    }
+
+    /** {@code PKCS12} or {@code JKS}; derived from the key store's extension when unset ({@code .p12}/{@code .pfx} → PKCS12). */
+    public String getKeyStoreType() {
+        if (keyStoreType != null) {
+            return keyStoreType;
+        }
+        String name = keyStore == null ? "" : keyStore.getFileName().toString().toLowerCase();
+        return name.endsWith(".p12") || name.endsWith(".pfx") ? "PKCS12" : "JKS";
+    }
+
+    public ServerConfig keyStoreType(String type) {
+        this.keyStoreType = type;
+        return this;
+    }
+
+    /** Redirect plain HTTP requests to the HTTPS port (keeps the HTTP port open for the redirect only). */
+    public boolean isHttpsRedirect() {
+        return httpsRedirect;
+    }
+
+    public ServerConfig httpsRedirect(boolean b) {
+        this.httpsRedirect = b;
+        return this;
+    }
+
+    /** Send {@code Strict-Transport-Security} on HTTPS responses (one year). */
+    public boolean isHsts() {
+        return hsts;
+    }
+
+    public ServerConfig hsts(boolean b) {
+        this.hsts = b;
         return this;
     }
 }

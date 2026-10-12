@@ -75,6 +75,12 @@ Open `http://localhost:8080/`. On the first start an `admin` account is created;
 `--trusted-proxy <ip>`, `--no-websocket` (long polling only, for a proxy that cannot forward the upgrade),
 `--http-threads N`, `--max-upload 256m`.
 
+HTTPS: `--https-port 8443 --keystore server.p12 --keystore-password …` serves TLS from the embedded Jetty
+(PKCS12 or JKS; `--https-redirect` sends plain-HTTP requests over, `--no-http` closes the plain port). With
+`--https-port` alone a self-signed certificate for `localhost` is generated into `data/system/selfsigned.p12`
+for development. Behind a TLS-terminating proxy instead, keep plain HTTP and pass `--trusted-proxy <ip>`
+(and `--secure-cookies`).
+
 Everything is JDK 8 compatible (`--release 8`); the build runs on JDK 8 or newer. The browser end-to-end checks
 used during development are `webbeans-demo/e2e/windows.js`, `nodes.js`, `actions.js`, `charts.js`, `scene3d.js`, `transport.js`, `components.js`, `components2.js`, `webbeans-tutorial/e2e/tutorial.js`, `workbench/e2e/help.js` and
 `workbench/e2e/workbench.js` (Playwright): they log in, drive the dock, the explorer, the menus, dialogs, notifications, charts and the 3D

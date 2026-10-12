@@ -13,6 +13,7 @@ import java.util.logging.Logger;
 
 import org.webbeans.auth.providers.PropertiesAuthenticationProvider;
 import org.webbeans.core.Platform;
+import org.webbeans.server.SelfSignedCertificate;
 import org.webbeans.server.ServerConfig;
 import org.webbeans.server.WbServer;
 
@@ -23,7 +24,15 @@ import org.webbeans.server.WbServer;
  * java -cp 'lib/*' org.webbeans.launcher.Main [--port 8080] [--host 0.0.0.0] [--datadir data] [--modules modules]
  *      [--context /app] [--title "My App"] [--locale de] [--session-timeout 30m] [--dev] [--admin-password x]
  *      [--no-websocket] [--http-threads 32] [--max-upload 256m]
+ *      [--https-port 8443 [--keystore server.p12 --keystore-password x [--key-password y] [--keystore-type PKCS12]]
+ *       [--https-redirect] [--no-http] [--no-hsts]]
  * </pre>
+ *
+ * HTTPS: {@code --https-port} serves TLS from the given key store (PKCS12 or JKS). Without {@code --keystore} a
+ * self-signed certificate for {@code localhost} is generated into {@code <datadir>/system/selfsigned.p12} on the
+ * first start (development only; browsers warn about it). {@code --https-redirect} keeps the HTTP port open only
+ * to redirect to HTTPS, {@code --no-http} closes it. The key store password may also come from the
+ * {@code WEBBEANS_KEYSTORE_PASSWORD} environment variable.
  *
  * On the first start with no {@code users.properties} an {@code admin} account is created; its password is taken
  * from {@code --admin-password} or the {@code WEBBEANS_ADMIN_PASSWORD} environment variable, otherwise generated
@@ -43,6 +52,9 @@ public final class Main {
         String adminPassword = System.getenv("WEBBEANS_ADMIN_PASSWORD");
         boolean noDefaultAdmin = false;
         String branding = null;
+        int httpsPort = -1;
+        Path keyStore = null;
+        String keyStorePassword = System.getenv("WEBBEANS_KEYSTORE_PASSWORD");
         for (int i = 0; i < args.length; i++) {
             String a = args[i];
             String v = i + 1 < args.length ? args[i + 1] : null;
@@ -93,14 +105,58 @@ public final class Main {
             } else if (a.equals("--max-upload")) {
                 config.maxUploadSize(parseSize(require(a, v)));   // 10m, 2g, 512k, or bytes
                 i++;
+            } else if (a.equals("--https-port")) {
+                httpsPort = Integer.parseInt(require(a, v));
+                i++;
+            } else if (a.equals("--keystore")) {
+                keyStore = Paths.get(require(a, v));
+                i++;
+            } else if (a.equals("--keystore-password")) {
+                keyStorePassword = require(a, v);
+                i++;
+            } else if (a.equals("--key-password")) {
+                config.keyManagerPassword(require(a, v));
+                i++;
+            } else if (a.equals("--keystore-type")) {
+                config.keyStoreType(require(a, v));
+                i++;
+            } else if (a.equals("--https-redirect")) {
+                config.httpsRedirect(true);
+            } else if (a.equals("--no-http")) {
+                config.httpEnabled(false);
+            } else if (a.equals("--no-hsts")) {
+                config.hsts(false);
             } else if (a.equals("--help") || a.equals("-h")) {
                 System.out.println("Options: --port N --host H --datadir DIR --modules DIR --context /path --title T --locale xx"
                         + " --session-timeout 30m --admin-password PW --no-default-admin --branding NAME --dev --secure-cookies --trusted-proxy IP"
-                        + " --no-websocket --http-threads N --max-upload 256m");
+                        + " --no-websocket --http-threads N --max-upload 256m"
+                        + " --https-port N --keystore FILE --keystore-password PW --key-password PW --keystore-type PKCS12|JKS"
+                        + " --https-redirect --no-http --no-hsts");
                 return;
             } else {
                 throw new IllegalArgumentException("Unknown option " + a);
             }
+        }
+
+        if (keyStore != null && httpsPort < 0) {
+            throw new IllegalArgumentException("--keystore needs --https-port");
+        }
+        if (httpsPort >= 0) {
+            if (keyStore == null) {
+                // development convenience: a self-signed certificate in the data directory
+                if (keyStorePassword == null) {
+                    keyStorePassword = "webbeans";
+                }
+                keyStore = SelfSignedCertificate.ensure(dataDir.resolve("system").resolve("selfsigned.p12"), keyStorePassword);
+                LOG.log(Level.WARNING, "HTTPS with a self-signed certificate ({0}); use --keystore for a real one", keyStore);
+            } else if (!Files.isRegularFile(keyStore)) {
+                throw new IllegalArgumentException("Key store not found: " + keyStore);
+            } else if (keyStorePassword == null) {
+                throw new IllegalArgumentException("--keystore needs --keystore-password (or WEBBEANS_KEYSTORE_PASSWORD)");
+            }
+            config.https(httpsPort, keyStore, keyStorePassword);
+        } else if (!config.isHttpEnabled() || config.isHttpsRedirect()) {
+            throw new IllegalArgumentException("--no-http and --https-redirect need --https-port");
         }
 
         if (branding != null && !branding.isEmpty()) {
@@ -130,7 +186,10 @@ public final class Main {
                 platform.shutdown(true);
             }
         });
-        LOG.log(Level.INFO, "Ready: http://localhost:{0}{1}/", new Object[] {String.valueOf(server.getPort()), config.getContextPath()});
+        String url = server.getHttpsPort() >= 0 && (!config.isHttpEnabled() || config.isHttpsRedirect())
+                ? "https://localhost:" + server.getHttpsPort()
+                : server.getPort() >= 0 ? "http://localhost:" + server.getPort() : "https://localhost:" + server.getHttpsPort();
+        LOG.log(Level.INFO, "Ready: {0}{1}/", new Object[] {url, config.getContextPath()});
         Thread.currentThread().join();
     }
 
