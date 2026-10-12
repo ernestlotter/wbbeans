@@ -61,6 +61,52 @@ public final class DefaultModuleSystem extends ModuleSystem implements ModuleCla
         modules.put(key, info);
     }
 
+    /** Forgets a module that is not enabled (after {@link #disable} when its jar goes away). */
+    public synchronized boolean remove(ModuleInfo info) {
+        if (info.isEnabled()) {
+            throw new IllegalStateException("Disable " + info + " before removing it");
+        }
+        return modules.values().remove(info);
+    }
+
+    /** The modules known from the given jar or directory. */
+    public synchronized List<ModuleInfo> findByLocation(File location) {
+        List<ModuleInfo> out = new ArrayList<ModuleInfo>();
+        for (ModuleInfo m : modules.values()) {
+            if (m.getLocation() != null && m.getLocation().getAbsoluteFile().equals(location.getAbsoluteFile())) {
+                out.add(m);
+            }
+        }
+        return out;
+    }
+
+    /** Enabled modules that depend on one of the given ones, directly or indirectly (the given ones excluded). */
+    public synchronized List<ModuleInfo> dependents(Collection<ModuleInfo> of) {
+        Set<String> names = new HashSet<String>();
+        for (ModuleInfo m : of) {
+            names.add(m.getCodeName());
+        }
+        List<ModuleInfo> out = new ArrayList<ModuleInfo>();
+        boolean grown = true;
+        while (grown) {
+            grown = false;
+            for (ModuleInfo m : enabledOrder) {
+                if (names.contains(m.getCodeName())) {
+                    continue;
+                }
+                for (Dependency d : m.getDependencies()) {
+                    if (d.getType() == Dependency.Type.MODULE && names.contains(d.getName())) {
+                        names.add(m.getCodeName());
+                        out.add(m);
+                        grown = true;
+                        break;
+                    }
+                }
+            }
+        }
+        return out;
+    }
+
     /** Scans every {@code *.jar} in the directory (non-recursively) for module manifests. */
     public synchronized List<ModuleInfo> discover(File directory) {
         List<ModuleInfo> found = new ArrayList<ModuleInfo>();

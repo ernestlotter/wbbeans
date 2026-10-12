@@ -161,6 +161,10 @@ HELP_CP="$OUT/webbeans-nodes.jar:$OUT/webbeans-actions.jar:$OUT/webbeans-windows
 build_module webbeans-help "$HELP_CP" "$APROCS -Awebbeans.module=org.webbeans.help"
 test_module webbeans-help "$OUT/webbeans-help.jar:$OUT/webbeans-test.jar:$HELP_CP" "$APROCS -Awebbeans.module=org.webbeans.help.test"
 
+MODULES_CP="$OUT/webbeans-nodes.jar:$OUT/webbeans-actions.jar:$OUT/webbeans-windows.jar:$OUT/webbeans-ui.jar:$UI_CP"
+build_module webbeans-modules "$MODULES_CP" "$APROCS -Awebbeans.module=org.webbeans.modules"
+test_module webbeans-modules "$OUT/webbeans-modules.jar:$OUT/webbeans-test.jar:$MODULES_CP" "-proc:none"
+
 SERVER_CP="$OUT/webbeans-ui.jar:$UI_CP:$JETTY_CP"
 build_module webbeans-server "$SERVER_CP" "-proc:none"
 test_module  webbeans-server "$OUT/webbeans-server.jar:$SERVER_CP:$JETTY_CLIENT_CP" "-proc:none"
@@ -195,7 +199,7 @@ for m in core files dashboard viewer3d admin; do [ -f "$OUT/workbench/workbench-
 mkdir -p "$OUT/workbench-dist"
 # shellcheck disable=SC2086
 python3 tools/fatjar.py "$OUT/workbench-dist/workbench.jar" \
-  --lib "$LIB/org-openide-util-lookup.jar" "$LIB/org-openide-util.jar" $(for j in $JETTY_JARS; do echo "$LIB/$j"; done) $(for m in core auth ui windows actions nodes help charts scene3d server launcher; do echo "$OUT/webbeans-$m.jar"; done) \
+  --lib "$LIB/org-openide-util-lookup.jar" "$LIB/org-openide-util.jar" $(for j in $JETTY_JARS; do echo "$LIB/$j"; done) $(for m in core auth ui windows actions nodes help modules charts scene3d server launcher; do echo "$OUT/webbeans-$m.jar"; done) \
   --modules $WBMODS --resources workbench/workbench-app/src/main/resources
 cp workbench/workbench-app/workbench.sh "$OUT/workbench-dist/"
 
@@ -203,7 +207,7 @@ cp workbench/workbench-app/workbench.sh "$OUT/workbench-dist/"
 rm -rf "$OUT/dist"; mkdir -p "$OUT/dist/lib" "$OUT/dist/modules"
 cp "$LIB/org-openide-util-lookup.jar" "$LIB/org-openide-util.jar" "$OUT/dist/lib/"
 for j in $JETTY_JARS; do cp "$LIB/$j" "$OUT/dist/lib/"; done
-for m in core auth ui windows actions nodes help charts scene3d test server launcher; do cp "$OUT/webbeans-$m.jar" "$OUT/dist/lib/"; done
+for m in core auth ui windows actions nodes help modules charts scene3d test server launcher; do cp "$OUT/webbeans-$m.jar" "$OUT/dist/lib/"; done
 cp "$OUT/webbeans-demo.jar" "$OUT/webbeans-tutorial.jar" "$OUT/dist/modules/"
 
 echo "== OK: $(ls "$OUT"/*.jar | xargs -n1 basename | tr '\n' ' ')"

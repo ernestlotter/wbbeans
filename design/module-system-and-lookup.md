@@ -72,7 +72,7 @@ public class ModuleInstall {
 }
 ```
 
-`enable(batch)`: resolve → per module: create class loader, instantiate `ModuleInstall`, `validate()` → `ModuleListener.modulesLoaded(batch)` (the platform rebuilds the `Registry` and re-targets `Lookup.getDefault()` here) → `restored()` each → `modulesEnabled`. `disable` is the reverse (`closing()`, `close()`, loader closed) and only for modules nothing enabled depends on. Hot reload is out of scope for v1.
+`enable(batch)`: resolve → per module: create class loader, instantiate `ModuleInstall`, `validate()` → `ModuleListener.modulesLoaded(batch)` (the platform rebuilds the `Registry` and re-targets `Lookup.getDefault()` here) → `restored()` each → `modulesEnabled`. `disable` is the reverse (`closing()`, `close()`, loader closed) and only for modules nothing enabled depends on. On top of that, `Platform.installModule/uninstallModule/enableModule/disableModule` (as built, step 13) add and remove modules at run time: the install directory `<datadir>/modules`, replacement in place with dependents re-enabled, a `ModuleWatcher` on that directory, and a `UISession.RegistryChangedEvent` that the server publishes to every session so menus, toolbars, shortcuts and windows follow (the `webbeans-modules` window drives it for administrators).
 
 ## 3. Class loading
 
@@ -240,4 +240,4 @@ All WebBeans annotations are `@Retention(SOURCE)`. `@ServiceProvider` is NetBean
 - Role filtering and locale resolution are first-class in the registry because views are per session.
 - Own `@Messages` for the same reason (session locale); NetBeans' `NbBundle.getMessage` remains usable with the JVM default locale.
 - No module auto-update in v1; modules are files in `modules/` and a restart.
-- `Lookup.getDefault()` is immutable after startup; dynamic services belong in the session lookup.
+- `Lookup.getDefault()` is re-targeted only when modules change (step 13); services that come and go within a session belong in the session lookup.

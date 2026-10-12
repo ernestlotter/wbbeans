@@ -199,6 +199,31 @@ public final class ModuleInfo {
         return displayName;
     }
 
+    /**
+     * The display name for the session's locale: the attribute, a {@code #KEY} resolved against
+     * {@code <codeName>.Bundle} while the module is enabled, else the code name.
+     */
+    public String getDisplayName() {
+        if (displayName == null || displayName.isEmpty()) {
+            return codeName;
+        }
+        if (!displayName.startsWith("#")) {
+            return displayName;
+        }
+        ClassLoader loader = classLoader;
+        if (loader == null) {
+            return codeName;
+        }
+        try {
+            java.util.ResourceBundle b = org.webbeans.core.i18n.Bundles.getBundle(loader, codeName + ".Bundle",
+                    org.webbeans.core.i18n.LocaleContext.get());
+            String key = displayName.substring(1);
+            return b.containsKey(key) ? b.getString(key) : codeName;
+        } catch (java.util.MissingResourceException e) {
+            return codeName;
+        }
+    }
+
     public boolean isAutoload() {
         return autoload;
     }

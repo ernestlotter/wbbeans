@@ -12,6 +12,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.webbeans.auth.providers.PropertiesAuthenticationProvider;
+import org.webbeans.core.ModuleWatcher;
 import org.webbeans.core.Platform;
 import org.webbeans.server.SelfSignedCertificate;
 import org.webbeans.server.ServerConfig;
@@ -27,6 +28,10 @@ import org.webbeans.server.WbServer;
  *      [--https-port 8443 [--keystore server.p12 --keystore-password x [--key-password y] [--keystore-type PKCS12]]
  *       [--https-redirect] [--no-http] [--no-hsts]]
  * </pre>
+ *
+ * Modules at run time: jars dropped into {@code <datadir>/modules} are installed (and removed ones uninstalled)
+ * while the application runs, unless {@code --no-watch-modules}; Tools ▸ Modules does the same from the browser
+ * for administrators.
  *
  * HTTPS: {@code --https-port} serves TLS from the given key store (PKCS12 or JKS). Without {@code --keystore} a
  * self-signed certificate for {@code localhost} is generated into {@code <datadir>/system/selfsigned.p12} on the
@@ -52,6 +57,7 @@ public final class Main {
         String adminPassword = System.getenv("WEBBEANS_ADMIN_PASSWORD");
         boolean noDefaultAdmin = false;
         String branding = null;
+        boolean watchModules = true;
         int httpsPort = -1;
         Path keyStore = null;
         String keyStorePassword = System.getenv("WEBBEANS_KEYSTORE_PASSWORD");
@@ -105,6 +111,8 @@ public final class Main {
             } else if (a.equals("--max-upload")) {
                 config.maxUploadSize(parseSize(require(a, v)));   // 10m, 2g, 512k, or bytes
                 i++;
+            } else if (a.equals("--no-watch-modules")) {
+                watchModules = false;   // do not pick up jars dropped into <datadir>/modules
             } else if (a.equals("--https-port")) {
                 httpsPort = Integer.parseInt(require(a, v));
                 i++;
@@ -131,7 +139,7 @@ public final class Main {
                         + " --session-timeout 30m --admin-password PW --no-default-admin --branding NAME --dev --secure-cookies --trusted-proxy IP"
                         + " --no-websocket --http-threads N --max-upload 256m"
                         + " --https-port N --keystore FILE --keystore-password PW --key-password PW --keystore-type PKCS12|JKS"
-                        + " --https-redirect --no-http --no-hsts");
+                        + " --https-redirect --no-http --no-hsts --no-watch-modules");
                 return;
             } else {
                 throw new IllegalArgumentException("Unknown option " + a);
@@ -179,9 +187,13 @@ public final class Main {
 
         final WbServer server = new WbServer(config);
         server.start();
+        final ModuleWatcher watcher = watchModules ? new ModuleWatcher(platform) : null;
         Runtime.getRuntime().addShutdownHook(new Thread("wb-shutdown") {
             @Override
             public void run() {
+                if (watcher != null) {
+                    watcher.close();
+                }
                 server.stop();
                 platform.shutdown(true);
             }

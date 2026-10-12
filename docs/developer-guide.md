@@ -183,6 +183,14 @@ Sharing a type between modules: put it into a public package of one module (`Web
 
 Platform services a module may provide: `UIProvider` (the page), `MainWindowDecorator` (customise each tab's main window), `AuthenticationProvider`/`RoleMapper`/`SessionPolicy` (§5), `HelpCtx.Displayer` (the help module's), `PageProvider` (a full HTML page under a path prefix for signed-in users, rendered on the session executor — the help module's `/wb/help/<id>` is one).
 
+**Modules at run time.** Modules can come and go while the application runs, without a restart and without users logging out:
+
+- `Platform.getCurrent().installModule(Path jar)` copies the jar into `<datadir>/modules/<codeName>.jar` and enables it; a running module with the same code name is replaced in place (it and the modules depending on it are disabled, the new version is enabled, the dependents re-enabled). `uninstallModule(codeName)` disables, forgets and deletes a module installed this way; `enableModule`/`disableModule` switch known modules (disabling takes the dependents along). `ModuleInfo.getProblem()` says why a module could not be enabled.
+- The launcher watches `<datadir>/modules` (`ModuleWatcher`; off with `--no-watch-modules`): drop a jar there and it is installed, delete it and it is uninstalled — the file-system equivalent of the window below. Jars installed at run time are found again at the next start.
+- *Tools ▸ Modules…* (module `webbeans-modules`, role `admin`): every known module with version, state and location; Install… (an upload field), Enable, Disable, Uninstall. Plain users never see it.
+- Open sessions follow: the server publishes `UISession.RegistryChangedEvent` to every session after the registry rebuilt. The main window rebuilds its menus, toolbars and shortcuts; the window manager opens the new module's start-up windows and closes (and forgets) windows whose registration vanished; when the client bundle changed (new or removed renderers) a notification offers a reload — the page keeps working on the old bundle until then. Your own components can subscribe to the same event on the session bus.
+- What stays in the module's hands: `ModuleInstall.close()` must stop what `restored()` started (threads, session-bus subscriptions, timers), because the class loader is closed afterwards. Objects of a disabled module that other code still holds (a node in a tree, a value in a model) keep working as Java objects, but nothing new is created from the registry.
+
 ---
 
 ## 5. Users, sessions, roles, per-user data
@@ -509,6 +517,7 @@ java -cp 'lib/*' org.webbeans.launcher.Main --modules modules --datadir data --p
 | `--dev` | off | rebuild the client bundle on every page load, no cache headers |
 | `--admin-password`, `--no-default-admin` | generated | first-start `admin` account |
 | `--no-websocket` | off | long polling only: the page does not try the WebSocket (a proxy that cannot forward the upgrade) |
+| `--no-watch-modules` | off | do not install/uninstall module jars dropped into or removed from `<datadir>/modules` while running (§4) |
 | `--http-threads` | 4 × cores, min 8 | Jetty's thread pool (connections, long polls, socket callbacks; session work runs on its own pool) |
 | `--max-upload` | 256m | largest file `/wb/upload` accepts (`512k`, `10m`, `2g`) |
 

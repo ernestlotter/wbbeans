@@ -25,6 +25,7 @@
     <module>webbeans-scene3d</module>
     <module>webbeans-test</module>
     <module>webbeans-help</module>
+    <module>webbeans-modules</module>
     <module>webbeans-server</module>
     <module>webbeans-launcher</module>
     <module>webbeans-demo</module>
@@ -120,6 +121,11 @@
       <dependency>
         <groupId>org.webbeans</groupId>
         <artifactId>webbeans-help</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.webbeans</groupId>
+        <artifactId>webbeans-modules</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>

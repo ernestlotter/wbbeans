@@ -70,9 +70,26 @@ public final class WbServer {
     private final ChangeListener registryListener = new ChangeListener() {
         @Override
         public void stateChanged(ChangeEvent e) {
-            app.invalidateBundle();
+            registryChanged();
         }
     };
+
+    /** Modules changed: rebuild the client bundle, then tell every session (its UIs re-read the registry). */
+    private void registryChanged() {
+        String before = app.currentBundleHash();
+        app.invalidateBundle();
+        boolean clientChanged;
+        try {
+            clientChanged = before != null && !before.equals(app.bundle().getHash());
+        } catch (RuntimeException ex) {
+            LOG.log(Level.WARNING, "Cannot rebuild the client bundle", ex);
+            clientChanged = true;
+        }
+        UISession.RegistryChangedEvent event = new UISession.RegistryChangedEvent(clientChanged);
+        for (HttpSession s : sessions.getSessions()) {
+            s.getUISession().publish(event);
+        }
+    }
 
     public WbServer(ServerConfig config) {
         this.config = config;

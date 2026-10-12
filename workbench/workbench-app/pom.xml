@@ -36,6 +36,10 @@
     </dependency>
     <dependency>
       <groupId>org.webbeans</groupId>
+      <artifactId>webbeans-modules</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.webbeans</groupId>
       <artifactId>webbeans-nodes</artifactId>
     </dependency>
   </dependencies>
