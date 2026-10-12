@@ -37,11 +37,21 @@
   </dependencies>
 
   <build>
+    <finalName>webbeans-launcher</finalName>
     <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <proc>none</proc>
+        </configuration>
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
         <configuration>
+          <!-- target/dist/webbeans-launcher.jar next to dist/lib, so the manifest class path (lib/) resolves -->
+          <outputDirectory>${project.build.directory}/dist</outputDirectory>
           <archive>
             <manifest>
               <mainClass>org.webbeans.launcher.Main</mainClass>

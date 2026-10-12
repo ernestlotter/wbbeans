@@ -81,6 +81,16 @@
           </annotationProcessorPaths>
           <compilerArgs><arg>-Awebbeans.module=org.webbeans.help</arg></compilerArgs>
         </configuration>
+        <executions>
+          <!-- the tests carry their own @HelpPage/@TopComponent registrations: generated as a second module
+               (org.webbeans.help.test.generated.WbRegistrations) so they do not shadow the main ones -->
+          <execution>
+            <id>default-testCompile</id>
+            <configuration>
+              <compilerArgs><arg>-Awebbeans.module=org.webbeans.help.test</arg></compilerArgs>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>

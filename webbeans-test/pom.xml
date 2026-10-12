@@ -48,5 +48,17 @@
     </dependency>
   </dependencies>
 
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <!-- no annotation processing here (service files are hand-written); mirrors build.sh -->
+          <proc>none</proc>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 </project>
 

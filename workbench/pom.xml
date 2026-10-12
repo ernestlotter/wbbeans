@@ -23,4 +23,19 @@
     <module>workbench-admin</module>
     <module>workbench-app</module>
   </modules>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.webbeans.workbench</groupId>
+        <artifactId>workbench-core</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.webbeans</groupId>
+        <artifactId>webbeans-launcher</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 </project>
