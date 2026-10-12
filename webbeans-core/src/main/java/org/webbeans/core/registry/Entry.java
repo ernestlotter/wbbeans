@@ -3,8 +3,6 @@ package org.webbeans.core.registry;
 import java.util.Map;
 import java.util.Set;
 
-import org.webbeans.core.modules.ModuleInfo;
-
 /**
  * One registration in the {@link Registry}: an instance, a reference to an instance elsewhere, or a separator.
  * Attribute values and display strings are resolved for the current {@link RegistryContext} (locale).
@@ -27,8 +25,8 @@ public interface Entry {
     /** Ordering within the folder; {@link Integer#MAX_VALUE} when unspecified. Effective value (user overlay applied). */
     int getPosition();
 
-    /** The module that registered this entry, or null for platform/programmatic registrations. */
-    ModuleInfo getModule();
+    /** The class loader of the code that contributed the entry (its bundles, icons and classes live there). */
+    ClassLoader getClassLoader();
 
     /** Roles allowed to see the entry; empty = everyone. */
     Set<String> getRoles();

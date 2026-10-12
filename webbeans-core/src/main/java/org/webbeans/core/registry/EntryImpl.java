@@ -11,7 +11,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.webbeans.core.i18n.Bundles;
-import org.webbeans.core.modules.ModuleInfo;
 
 /** The merged, shared form of a registration. Context-dependent reads consult {@link RegistryContext#current()}. */
 final class EntryImpl implements Entry {
@@ -31,12 +30,12 @@ final class EntryImpl implements Entry {
     private final String bundle;
     private final int position;
     final Set<String> roles;
-    final ModuleInfo module;
+    final String origin;
     private final ClassLoader loader;
     private volatile Object instance;
 
     EntryImpl(Registry registry, String path, Kind kind, String target, Function<Entry, ?> factory, Class<?> instanceOf,
-            Map<String, Object> attrs, String bundle, int position, Set<String> roles, ModuleInfo module, ClassLoader loader) {
+            Map<String, Object> attrs, String bundle, int position, Set<String> roles, String origin, ClassLoader loader) {
         this.registry = registry;
         this.path = path;
         int slash = path.lastIndexOf('/');
@@ -50,7 +49,7 @@ final class EntryImpl implements Entry {
         this.bundle = bundle;
         this.position = position;
         this.roles = Collections.unmodifiableSet(new LinkedHashSet<String>(roles));
-        this.module = module;
+        this.origin = origin;
         this.loader = loader;
     }
 
@@ -92,8 +91,8 @@ final class EntryImpl implements Entry {
     }
 
     @Override
-    public ModuleInfo getModule() {
-        return module;
+    public ClassLoader getClassLoader() {
+        return loader;
     }
 
     @Override

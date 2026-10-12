@@ -56,12 +56,6 @@ public final class AppHandler extends HttpServlet {
         bundle = null;
     }
 
-    /** The hash of the bundle as built so far, or null when none has been built (nobody loaded a page yet). */
-    public String currentBundleHash() {
-        Bundler.Bundle b = bundle;
-        return b == null ? null : b.getHash();
-    }
-
     public Bundler.Bundle bundle() {
         Bundler.Bundle b = bundle;
         if (b == null || config.isDevMode()) {

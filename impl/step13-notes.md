@@ -17,7 +17,9 @@ while the application runs. Source: repository `main` (`ff98d3e` HTTPS, the live
 The browser picks `wss://` by itself, so the WebSocket transport needs nothing. A TLS-terminating proxy remains
 the alternative (`--trusted-proxy`, `--secure-cookies`). Not done: HTTP/2 (ALPN on JDK 8), ACME renewal.
 
-## 2. Modules at run time
+## 2. Modules at run time (withdrawn in step 14)
+
+> Everything in this section was removed again in step 14 together with the module system itself (`impl/step14-notes.md`): the application is now the class path and a change of code is a restart. The section stays as the record of what was built and verified.
 
 ### Platform (`webbeans-core`)
 

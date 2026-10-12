@@ -1,6 +1,6 @@
 # WebBeans Developer Guide
 
-WebBeans is a rich web application platform in the spirit of the NetBeans Platform: you write modules in Java 8, the platform renders them in the browser. There is no client code to write for ordinary applications — UI, actions, nodes, charts and 3D scenes are Java objects on the server; a generated JavaScript bundle mirrors them in the browser.
+WebBeans is a rich web application platform in the spirit of the NetBeans Platform: you write the application in Java 8 (ordinary jars on the class path), the platform renders it in the browser. There is no client code to write for ordinary applications — UI, actions, nodes, charts and 3D scenes are Java objects on the server; a generated JavaScript bundle mirrors them in the browser.
 
 This guide covers concepts and workflows. For a per-component reference with examples, see the **Component Guide** (`docs/component-guide.md`); for a step-by-step tutorial that builds up from a label to a complete application, the **User's Guide** (`docs/user-guide.md`). The **Workbench** sample application (`workbench/` in the repository, `design/sample-app.md`) is the worked example used throughout.
 
@@ -21,19 +21,19 @@ Start from the Workbench: copy `workbench/` and keep what you need.
 ```
 myapp/
   pom.xml                  packaging pom; parent org.webbeans:webbeans-parent (manages all versions)
-  hello/                   a module: src/main/java + src/main/resources/META-INF/MANIFEST.MF
-  app/                     the application jar: branding, the launcher, the modules embedded (dependency + shade plugins)
+  hello/                   an ordinary jar: src/main/java (+ resources), the annotation processors on the compiler path
+  app/                     the application jar: branding, the launcher and every jar merged into one (shade plugin)
 ```
 
-Build with `mvn package` and run `java -jar app/target/myapp.jar --datadir data` (offline: `./build.sh` produces `build/workbench-dist/workbench.jar` the same way, see §15). Open `http://localhost:8080`, log in as `admin` (the password is printed on the first start, or set `WEBBEANS_ADMIN_PASSWORD`; accounts live in `data/system/users.properties`) — or seed your own accounts from a `ModuleInstall` as the Workbench does.
+Build with `mvn package` and run `java -jar app/target/myapp.jar --datadir data` (offline: `./build.sh` produces `build/workbench-dist/workbench.jar` the same way, see §15). Open `http://localhost:8080`, log in as `admin` (the password is printed on the first start, or set `WEBBEANS_ADMIN_PASSWORD`; accounts live in `data/system/users.properties`) — or seed your own accounts from an `Installer` as the Workbench does. The smallest complete application is `examples/hello` (a pom and one action class).
 
-### 1.3 Anatomy of a module
+### 1.3 Anatomy of an application jar
 
-A module is a jar with a manifest and annotated classes:
+The application is the class path: every jar on it contributes what its `META-INF/services` files list — the registrations the annotation processor generated, `@ServiceProvider` services, `Installer`s. There is no manifest, no module descriptor, no dependency declaration and no isolation between jars; split an application into several Maven projects for the usual reasons (ownership, reuse), not because the platform needs it.
 
 ```
 hello/
-  pom.xml                                   the three annotation processors on the compiler path (copy workbench-files/pom.xml)
+  pom.xml                                   the three annotation processors on the compiler path (copy examples/hello/pom.xml)
   src/main/java/com/acme/hello/
       HelloTopComponent.java
       SayHelloAction.java
@@ -42,24 +42,13 @@ hello/
       Bundle_de.properties                  translations
   src/main/resources/com/acme/hello/hello.svg
   src/main/resources/com/acme/hello/help/hello.md       help pages (§10)
-  src/main/resources/META-INF/MANIFEST.MF
 ```
 
-```
-Manifest-Version: 1.0
-WebBeans-Module: com.acme.hello
-WebBeans-Module-Version: 1.0.0
-WebBeans-Module-Display-Name: #CTL_HelloModule
-WebBeans-Module-Dependencies: com.acme.core > 1.0
-WebBeans-Module-Public-Packages: com.acme.hello.api
-WebBeans-Module-Install: com.acme.hello.Installer
-```
-
-The compiler needs the annotation processors on its path: `webbeans-processor` plus `webbeans-windows-processor` and `webbeans-actions-processor` (and NetBeans' `org-openide-util-lookup` for `@ServiceProvider`) in `annotationProcessorPaths`, with `-Awebbeans.module=<code name>` — `workbench/workbench-files/pom.xml` is the template.
+The compiler needs the annotation processors on its path: `webbeans-processor` plus `webbeans-windows-processor` and `webbeans-actions-processor` (and NetBeans' `org-openide-util-lookup` for `@ServiceProvider`) in `annotationProcessorPaths`, with `-Awebbeans.module=<name>` naming the package of the generated `WbRegistrations` class (one per jar; `examples/hello/pom.xml` and `workbench/workbench-files/pom.xml` are templates).
 
 Rules worth knowing from day one:
 
-- A module sees only the platform and the public packages of modules it declares dependencies on. A `ClassNotFoundException` message tells you which dependency or export is missing.
+- Order on the class path is the only precedence: when two jars register the same path (`Menu/Tools/x`), the later jar wins and a warning is logged; `@Hide` masks entries deliberately.
 - Everything is registered with annotations. There is no XML. The annotation processor runs automatically during `mvn compile` and generates `<codeName>.generated.WbRegistrations`; registration errors (a component without `@Description`, missing bundle key, duplicate path, a registered class without a public no-arg constructor, an action class with two public constructors, a help page without a resource) are compile errors.
 - `Lookup` and `@ServiceProvider` are NetBeans' (`org.openide.util`). `@Messages` is WebBeans' own (`org.webbeans.core.i18n.Messages`) with the same syntax — its generated `Bundle` methods use the user's locale, which NetBeans' cannot (see §6).
 
@@ -119,7 +108,7 @@ public final class HelloProvider implements UIProvider {
    Browser tab  ──transport──►  UI                         ┐
                                                            ├── UISession (user, locale, lookup, executor, user files)
    background job ── session.access(…) ────────────────────┘
-                                               ┌─ Lookup.getDefault()  (services from every module)
+                                               ┌─ Lookup.getDefault()  (services from every jar)
                                                └─ Registry             (actions, menus, modes, components, …)
 ```
 
@@ -150,12 +139,12 @@ Long work goes off-thread with NetBeans' `RequestProcessor` (or `@ActionRegistra
 
 ---
 
-## 4. Modules, services, lifecycle
+## 4. Services and lifecycle
 
 ```java
-public final class Installer extends ModuleInstall {
-    @Override public void validate() { /* throw IllegalStateException to veto enabling */ }
-    @Override public void restored() {              // all modules loaded; seed data, register listeners, start background jobs
+@ServiceProvider(service = Installer.class)
+public final class WorkbenchInstaller extends Installer {
+    @Override public void restored() {              // registry and Lookup complete; seed data, register listeners, start background jobs
         Path users = Lookup.getDefault().lookup(DataDir.class).getSystemDir().resolve("users.properties");
         if (!Files.exists(users)) PropertiesAuthenticationProvider.putAccount(users, "alice", "secret".toCharArray(), "Alice", "user", "admin");
     }
@@ -164,7 +153,7 @@ public final class Installer extends ModuleInstall {
 }
 ```
 
-Register it with the manifest attribute `WebBeans-Module-Install: com.acme.hello.Installer`.
+`Installer`s are found through `META-INF/services/org.webbeans.core.Installer` (the `@ServiceProvider` above writes that file); `restored()` runs in Lookup order once the platform is up, `closing()`/`close()` in reverse order at shutdown.
 
 Services:
 
@@ -177,19 +166,13 @@ public final class DefaultGreetingService implements GreetingService { … }
 GreetingService g = Lookup.getDefault().lookup(GreetingService.class);     // anywhere
 ```
 
-Per-user services are registered under `Services/Session` (`@Registration(path = "Services/Session", type = PartsModel.class)`) and created once per `UISession` — in its constructor, before any task runs, so do not call `UISession.current()` from the service's constructor; bind it lazily from the first call that reaches you on the executor. Look them up in `UISession.current().getLookup()`; implement `AutoCloseable` to be closed with the session. `@Registration` works on any public class with a public no-arg constructor, or on a public static factory method; `name`, `position`, `attrs = {"key=value"}`, `roles` and `references` are optional. `@FolderRegistration(path, displayName, position)` declares a folder with attributes (a menu, a toolbar). `@Hide({"Menu/Tools/old"})` masks entries of other modules.
+Per-user services are registered under `Services/Session` (`@Registration(path = "Services/Session", type = PartsModel.class)`) and created once per `UISession` — in its constructor, before any task runs, so do not call `UISession.current()` from the service's constructor; bind it lazily from the first call that reaches you on the executor. Look them up in `UISession.current().getLookup()`; implement `AutoCloseable` to be closed with the session. `@Registration` works on any public class with a public no-arg constructor, or on a public static factory method; `name`, `position`, `attrs = {"key=value"}`, `roles` and `references` are optional. `@FolderRegistration(path, displayName, position)` declares a folder with attributes (a menu, a toolbar). `@Hide({"Menu/Tools/old"})` masks entries of other jars.
 
-Sharing a type between modules: put it into a public package of one module (`WebBeans-Module-Public-Packages: com.acme.core.api`) and declare `WebBeans-Module-Dependencies: com.acme.core > 1.0` in the others — the Workbench shares exactly one such type, its `LogMessage`.
+Sharing a type between jars is ordinary Java: put it in whichever jar the others depend on (Maven dependency) — the Workbench shares one such type, its `LogMessage`, from `workbench-core`.
 
-Platform services a module may provide: `UIProvider` (the page), `MainWindowDecorator` (customise each tab's main window), `AuthenticationProvider`/`RoleMapper`/`SessionPolicy` (§5), `HelpCtx.Displayer` (the help module's), `PageProvider` (a full HTML page under a path prefix for signed-in users, rendered on the session executor — the help module's `/wb/help/<id>` is one).
+Platform services a jar may provide: `UIProvider` (the page), `MainWindowDecorator` (customise each tab's main window), `AuthenticationProvider`/`RoleMapper`/`SessionPolicy` (§5), `HelpCtx.Displayer` (the help system's), `PageProvider` (a full HTML page under a path prefix for signed-in users, rendered on the session executor — the help system's `/wb/help/<id>` is one).
 
-**Modules at run time.** Modules can come and go while the application runs, without a restart and without users logging out:
-
-- `Platform.getCurrent().installModule(Path jar)` copies the jar into `<datadir>/modules/<codeName>.jar` and enables it; a running module with the same code name is replaced in place (it and the modules depending on it are disabled, the new version is enabled, the dependents re-enabled). `uninstallModule(codeName)` disables, forgets and deletes a module installed this way; `enableModule`/`disableModule` switch known modules (disabling takes the dependents along). `ModuleInfo.getProblem()` says why a module could not be enabled.
-- The launcher watches `<datadir>/modules` (`ModuleWatcher`; off with `--no-watch-modules`): drop a jar there and it is installed, delete it and it is uninstalled — the file-system equivalent of the window below. Jars installed at run time are found again at the next start.
-- *Tools ▸ Modules…* (module `webbeans-modules`, role `admin`): every known module with version, state and location; Install… (an upload field), Enable, Disable, Uninstall. Plain users never see it.
-- Open sessions follow: the server publishes `UISession.RegistryChangedEvent` to every session after the registry rebuilt. The main window rebuilds its menus, toolbars and shortcuts; the window manager opens the new module's start-up windows and closes (and forgets) windows whose registration vanished; when the client bundle changed (new or removed renderers) a notification offers a reload — the page keeps working on the old bundle until then. Your own components can subscribe to the same event on the session bus.
-- What stays in the module's hands: `ModuleInstall.close()` must stop what `restored()` started (threads, session-bus subscriptions, timers), because the class loader is closed afterwards. Objects of a disabled module that other code still holds (a node in a tree, a value in a model) keep working as Java objects, but nothing new is created from the registry.
+The class path is read once at start-up: `Platform.start` builds the registry from every `RegistrationProvider` the class loader can see and publishes the platform singletons plus every `@ServiceProvider` in `Lookup.getDefault()`. Changing the application means restarting it; services that come and go within a session belong in the session lookup.
 
 ---
 
@@ -197,7 +180,7 @@ Platform services a module may provide: `UIProvider` (the page), `MainWindowDeco
 
 - `UISession.current().getPrincipal()` → id, name, display name, email, roles, attributes, provider. `principal.hasRole("admin")` for programmatic checks; `Security.checkRole("admin")` throws `AccessDeniedException`; `Security.isAllowed(permission, target)` consults the `Authorizer`s in the lookup.
 - Declarative checks: `roles = {"admin"}` on `@TopComponent.Registration`, `@ActionRegistration`, `@OptionsPanelController.TopLevelRegistration`, `@HelpPage` and `@Registration`. Entries not allowed for the user are never sent to the browser: their windows, menu items (including the Window-menu entry of a window), toolbar buttons, shortcuts, popup entries and help pages do not exist for that user, and `findTopComponent` returns null.
-- `UISession.current().getUserFiles().dir("com.acme.hello")` → a per-user directory your module owns. Use `userFiles.write(path, bytes)` for durable (atomic) writes.
+- `UISession.current().getUserFiles().dir("com.acme.hello")` → a per-user directory your code owns. Use `userFiles.write(path, bytes)` for durable (atomic) writes.
 - `WbPreferences.forModule(Hello.class)` → `java.util.prefs.Preferences` stored under the user's `preferences/<package>.properties` (flat, written through immediately; `Actions.checkbox` menu items and options panels use it). `WbPreferences.forModule(session, Hello.class)` from outside a session task.
 - Session-wide events: `session.publish(new OrderPlaced(id))`; `session.subscribe(OrderPlaced.class, e -> …)` — delivered on the session executor to every subscriber of that user, whichever tab subscribed (the Workbench's Output window shows `LogMessage`s published by any window). `subscribe` returns a handle; remove it in `componentClosed`. Cross-user communication goes through a service you write in `Lookup.getDefault()`; `SessionDirectory` (in the default lookup when the server runs) lists every live `UISession`.
 - Authentication is pluggable (`design/authentication.md`): implement `org.webbeans.auth.spi.AuthenticationProvider` (`supports`, `authenticate`, `getLoginMethod` — a form, a redirect to an identity provider, or a client script such as the Firebase SDK) and register it with `@ServiceProvider(service = AuthenticationProvider.class, position = 50)` to sit before the shipped properties-file provider. `RoleMapper`s add or translate roles, `SessionPolicy` sets timeouts per user, `AuthenticationListener`s audit logins. Several tabs of one browser share one `UISession`; `UI.logout()` ends it for all of them.
@@ -217,15 +200,15 @@ Platform services a module may provide: `UIProvider` (the page), `MainWindowDeco
 
 ## 7. Window system
 
-- A `TopComponent` is a `Panel` that lives in a `Mode` as a tab. Register singletons with `@TopComponent.Registration(mode = …, openAtStartup = …, roles = …)` + `@TopComponent.Description(preferredID = …, iconBase = …, helpId = …)`; add `@TopComponent.OpenActionRegistration(displayName = "#CTL_…")` for a Window-menu entry. Standard modes: `explorer`, `navigator`, `editor`, `properties`, `output` (and the help module's `help`); declare your own with `@Mode.Registration(name, side, defaultSize)` on any class (the Workbench's `admin` mode sits on the window that uses it). Put `webbeans-processor` **and** `webbeans-windows-processor` on the module's annotation processor path.
+- A `TopComponent` is a `Panel` that lives in a `Mode` as a tab. Register singletons with `@TopComponent.Registration(mode = …, openAtStartup = …, roles = …)` + `@TopComponent.Description(preferredID = …, iconBase = …, helpId = …)`; add `@TopComponent.OpenActionRegistration(displayName = "#CTL_…")` for a Window-menu entry. Standard modes: `explorer`, `navigator`, `editor`, `properties`, `output` (and the help system's `help`); declare your own with `@Mode.Registration(name, side, defaultSize)` on any class (the Workbench's `admin` mode sits on the window that uses it). Put `webbeans-processor` **and** `webbeans-windows-processor` on the annotation processor path.
 - Singleton components: let the platform create them (`openAtStartup`, the generated open action, or `WindowManager.getDefault().findTopComponent("MyTC").requestActive()`).
 - Multi-instance components (editors): construct them yourself and call `open()` + `requestActive()`; they get ids `MyTC#1`, `#2`… To have them reopen at the next login, give them `writeState` and a `Factory`: `@TopComponent.Description(preferredID = "EditorTC", factory = EditorTC.Factory.class)` with `public static final class Factory implements TopComponent.Factory { public TopComponent create(Map<String,Object> state) {…} }` (return null when the thing no longer exists). Find an existing instance by walking `wm.getOpened()` (see `EditorTopComponent.openFor` in the Workbench).
 - Lifecycle callbacks run on the session executor: `componentOpened` (set the root context, subscribe, start timers), `componentShowing/Hidden`, `componentActivated/Deactivated`, `canClose` (veto; ask asynchronously and call `close()` again), `componentClosed` (unsubscribe, stop timers), `localeChanged` (re-read your strings).
 - Tab decoration: `setDisplayName`, `setHtmlDisplayName("<b>…</b>")`, `setIcon(Resource.of(…))`, `setToolTipText`, `setClosable(false)`, `makeBusy(true)` (spinner), `setModified(true)` (marker). Help: `getHelpCtx()` is what `F1` shows while the window is active — the `helpId` of the description, or whatever `setHelpCtx(new HelpCtx("…"))` set (change it as the user moves through the window).
 - Each browser tab has its own `WindowManager` and layout; changes are saved per user two seconds after they happen (`layout.json`), and a new tab starts from the most recently saved layout. `wm.saveLayout("name")`/`loadLayout`, `setRole("admin")` for per-role layouts, `resetLayout()` for the registry defaults. Ship a layout with `@LayoutRegistration(role = "admin", resource = "com/acme/app/layouts/admin.json")` (the JSON a saved `layout.json` contains): it is used for users who have no saved layout for that role. `wm.setMaximized/setFloating/setMinimized(tc, …)` do what the dock's buttons do; users can also drag tabs between modes, drop them at a mode's edge (a new split), float them, minimise a mode to the side bar and resize the gutters.
 - Put selection into the component's lookup (`associateLookup(ExplorerUtils.createLookup(em, actionMap))`, or `Lookups.fixed(selectedThing)`) — `wm.getGlobalContext()` follows the activated component, and that is what the Properties window, menus, toolbars and shortcuts react to. Put an `ActionMap` into the lookup too: the global Edit menu, its toolbar and `Ctrl+C/X/V`, `Delete`, `F2` are callback actions that delegate to the `copy/cut/paste/delete/rename/find` entries of the activated window's map. `wm.getRegistry().addPropertyChangeListener` tells you when the activation or the set of open windows changes; `getRegistry().getActivatedNodes()` gives the activated window's nodes.
-- Status bar: `StatusDisplayer.getDefault().setStatusText("…")` from any thread; permanent cells are static factory methods registered with `@Registration(path = "StatusBar", type = Component.class)` (one instance per UI). The actions module contributes the progress cell and the notifications bell.
-- The default page is the main window (`MainWindowProvider`); your own `UIProvider` replaces it, and can call `MainWindowProvider.build(ui)` to get the main window plus its own additions. Modules that want to add to the main window — or run something when a tab opens (apply saved preferences, switch the role) — register a `MainWindowDecorator` service.
+- Status bar: `StatusDisplayer.getDefault().setStatusText("…")` from any thread; permanent cells are static factory methods registered with `@Registration(path = "StatusBar", type = Component.class)` (one instance per UI). The actions jar contributes the progress cell and the notifications bell.
+- The default page is the main window (`MainWindowProvider`); your own `UIProvider` replaces it, and can call `MainWindowProvider.build(ui)` to get the main window plus its own additions. Code that wants to add to the main window — or run something when a tab opens (apply saved preferences, switch the role) — register a `MainWindowDecorator` service.
 - Keyboard: `Ctrl+Shift+Enter` maximize/restore, `Alt+W` close, `Alt+Shift+←/→` cycle tabs, `F1` help; application shortcuts come from `@ActionReference(path = "Shortcuts", name = "D-S")`; bind ad-hoc ones with `ui.bindShortcut("Ctrl+Shift+S", "my.save", runnable)`. Plain keys and `Ctrl+C/V/X/A/Z/Y` stay local while a text field has the focus; no shortcut fires while a modal dialog is open (inside a dialog, `F1` presses its Help button).
 - One naming trap: inside a `TopComponent` subclass, `Registration` is `TopComponent.Registration`; write `org.webbeans.ui.Registration` for listener handles.
 
@@ -353,7 +336,7 @@ public final class DashboardOptions extends OptionsPanelController {
 
 `OptionsDisplayer.getDefault().open("DashboardOptions")` opens the dialog on a category and completes with `true` on OK. Categories carry `roles`; the dialog creates a fresh controller per opening, calls `update()` before showing a page, `applyChanges()` on OK/Apply for changed controllers and `cancel()` on Cancel.
 
-- **Help** (`F1`, Help ▸ Help Contents, the Help buttons of dialogs): pages are Markdown or HTML resources in your module, registered with `@HelpPage` on a class or `package-info.java`:
+- **Help** (`F1`, Help ▸ Help Contents, the Help buttons of dialogs): pages are Markdown or HTML resources in your jar, registered with `@HelpPage` on a class or `package-info.java`:
 
 ```java
 @HelpPage(id = "files", parent = "workbench", title = "#HLP_Files", resource = "org/webbeans/workbench/files/help/files.md", position = 100, keywords = "#KW_Files")
@@ -362,7 +345,7 @@ public final class DashboardOptions extends OptionsPanelController {
 package org.webbeans.workbench.files;
 ```
 
-The table of contents is a tree over the registry folder `Help/Pages` (`parent` nests pages — across modules, too; `position` orders; `roles` filters; the first top-level page is the **home page**). Connect pages to the UI with `helpId` on `@TopComponent.Description` (or `setHelpCtx`), `NotifyDescriptor.setHelpCtx`, `OptionsPanelController.getHelpId`, or `new HelpCtx("files.editor").display()` from code. In a page, link to other pages by file (`[editor](editor.md)`, `../../core/help/workbench.md`) — resolved to the registered page — or with `help:<id>` and `#heading-slug`; images next to the page are served from the module; `page_de.md` is the German variant. The Help window (`HelpTC`, its own mode on the right) shows breadcrumbs, the page, a search over titles, keywords and text, Back, and *Open in new tab*, which leads to `GET /wb/help/<id>` — the same page as a stand-alone document for bookmarks and printing (signed-in users, same filtering). The platform ships one page, `platform` ("Getting around"), about the window system; link to it from your overview. Under the hood: `HelpSet.current()` (the topics), `HelpContent.html(set, topic, locale)` (rendering), `Markdown.toHtml`, `HelpViewer` (the component), `HelpDisplayer` (the `HelpCtx.Displayer` service), `HelpPageProvider` (the `PageProvider`).
+The table of contents is a tree over the registry folder `Help/Pages` (`parent` nests pages — across jars, too; `position` orders; `roles` filters; the first top-level page is the **home page**). Connect pages to the UI with `helpId` on `@TopComponent.Description` (or `setHelpCtx`), `NotifyDescriptor.setHelpCtx`, `OptionsPanelController.getHelpId`, or `new HelpCtx("files.editor").display()` from code. In a page, link to other pages by file (`[editor](editor.md)`, `../../core/help/workbench.md`) — resolved to the registered page — or with `help:<id>` and `#heading-slug`; images next to the page are served from the jar; `page_de.md` is the German variant. The Help window (`HelpTC`, its own mode on the right) shows breadcrumbs, the page, a search over titles, keywords and text, Back, and *Open in new tab*, which leads to `GET /wb/help/<id>` — the same page as a stand-alone document for bookmarks and printing (signed-in users, same filtering). The platform ships one page, `platform` ("Getting around"), about the window system; link to it from your overview. Under the hood: `HelpSet.current()` (the topics), `HelpContent.html(set, topic, locale)` (rendering), `Markdown.toHtml`, `HelpViewer` (the component), `HelpDisplayer` (the `HelpCtx.Displayer` service), `HelpPageProvider` (the `PageProvider`).
 
 ---
 
@@ -426,7 +409,7 @@ scene.addListener(Scene3D.PICK, e -> { scene.setSelection(e.getNode()); status(e
 When a built-in component does not fit, write one: a Java class and a JavaScript renderer.
 
 ```java
-@Renderer(id = "acme.Gauge", resource = "com/acme/widgets/gauge.js", css = "com/acme/widgets/gauge.css")   // resources in this module's jar; bundled at startup
+@Renderer(id = "acme.Gauge", resource = "com/acme/widgets/gauge.js", css = "com/acme/widgets/gauge.css")   // resources in the jar; bundled at startup
 public class Gauge extends Component {
     public static final Property<Double> VALUE = Property.of("value", Double.class, 0.0);
     public static final Property<Double> MAX   = Property.of("max",   Double.class, 100.0);
@@ -450,7 +433,7 @@ wb.register('acme.Gauge', {
 });
 ```
 
-Guidelines: keep state on the server unless it is purely visual; mark properties the browser owns (`Property.clientOwned()`) and continuous events `lazy(ms)`; for a value-bearing input extend `ValueComponent<T>` (validation, `required`, `readOnly`, `change` events come for free); never put HTML from users into `innerHTML` (use text nodes, or run it through `Html.sanitize` on the server as the help viewer does); style with `--wb-*` CSS variables and prefix your own classes (the platform owns `wb-`); set `setTestId("...")` on components your tests need (`data-test` attribute, `HeadlessUI.byTestId`). If the component delivers bulk state with `call(...)` rather than properties (the explorer views, the notification host, the chart and the 3D scene do), override `resync()` to send it again — the platform calls it when a tab gets a full `init`. To coalesce many mutations of one task into a single call, register `getUI().beforeFlush(runnable)` on the first mutation and emit the merged call there (`Chart` and `Scene3D` are the pattern). Make calls from `attached()`, never from the constructor's expectations about the wire. A transient component in the overlay (a popup, a toast) that must keep working while a modal dialog is open registers with `ui.allowWhileModal(component)`. Large binary payloads (geometry, images) go through `BlobStore.getDefault().put(bytes, type)` and are fetched by the renderer from `/wb/blob/<id>` (content-addressed, cacheable). A renderer that needs a third-party library loads it on demand with a script tag from `/wb/res/` (as `scene3d.js` does with three.js) rather than bundling it for every page. A module that needs a whole page outside the single-page application (a printable report, a help page) implements `PageProvider` (`@ServiceProvider`): the front end routes its prefix to it for signed-in users and renders on the session executor. Run with `--dev` so the bundle is rebuilt on every page load while you edit the renderer.
+Guidelines: keep state on the server unless it is purely visual; mark properties the browser owns (`Property.clientOwned()`) and continuous events `lazy(ms)`; for a value-bearing input extend `ValueComponent<T>` (validation, `required`, `readOnly`, `change` events come for free); never put HTML from users into `innerHTML` (use text nodes, or run it through `Html.sanitize` on the server as the help viewer does); style with `--wb-*` CSS variables and prefix your own classes (the platform owns `wb-`); set `setTestId("...")` on components your tests need (`data-test` attribute, `HeadlessUI.byTestId`). If the component delivers bulk state with `call(...)` rather than properties (the explorer views, the notification host, the chart and the 3D scene do), override `resync()` to send it again — the platform calls it when a tab gets a full `init`. To coalesce many mutations of one task into a single call, register `getUI().beforeFlush(runnable)` on the first mutation and emit the merged call there (`Chart` and `Scene3D` are the pattern). Make calls from `attached()`, never from the constructor's expectations about the wire. A transient component in the overlay (a popup, a toast) that must keep working while a modal dialog is open registers with `ui.allowWhileModal(component)`. Large binary payloads (geometry, images) go through `BlobStore.getDefault().put(bytes, type)` and are fetched by the renderer from `/wb/blob/<id>` (content-addressed, cacheable). A renderer that needs a third-party library loads it on demand with a script tag from `/wb/res/` (as `scene3d.js` does with three.js) rather than bundling it for every page. Code that needs a whole page outside the single-page application (a printable report, a help page) implements `PageProvider` (`@ServiceProvider`): the front end routes its prefix to it for signed-in users and renders on the session executor. Run with `--dev` so the bundle is rebuilt on every page load while you edit the renderer.
 
 More patterns from the step-12 components, all in `webbeans-ui`:
 
@@ -462,13 +445,13 @@ More patterns from the step-12 components, all in `webbeans-ui`:
 - **Shared popups.** `wb.placePopup(el, anchor, placement)` positions a fixed element next to an anchor and flips it when there is no room; elements with `wb-popup-open` close on Escape or an outside click (`wb-popup-sticky` opts out). `SplitButton`, `ColorPicker` and `Popover` share it.
 - **Locale on the client.** The `init` message's locale is kept in `wb.locale` (and `<html lang>`), so renderers format dates and numbers with `Intl` for the session locale (`Calendar`'s month and day names).
 - **Drag and drop between components.** `Palette` items carry the MIME type `text/x-wb-palette`; any renderer that accepts it (`Diagram`) turns the drop into an event with its own coordinates. `Kanban` and `Calendar` move their own elements with the same HTML5 API and report the result.
-- **Text utilities.** `org.webbeans.ui.text.Markdown` (moved here from the help module; `toHtml`, `inline`, `escape`) and `LineDiff` (Myers' diff, `unified`) are plain classes usable without components.
+- **Text utilities.** `org.webbeans.ui.text.Markdown` (moved here from the help system; `toHtml`, `inline`, `escape`) and `LineDiff` (Myers' diff, `unified`) are plain classes usable without components.
 
 ---
 
 ## 14. Testing
 
-- **`HeadlessUI`** (`webbeans-test`) runs a complete session without a server or browser: the registry from the test class path (every module jar on it contributes its registrations), the real main window, a temporary data directory, and a recorder for everything the browser would receive.
+- **`HeadlessUI`** (`webbeans-test`) runs a complete session without a server or browser: the registry from the test class path (every jar on it contributes its registrations), the real main window, a temporary data directory, and a recorder for everything the browser would receive.
 
 ```java
 try (HeadlessUI h = HeadlessUI.builder().user("alice", "user", "admin").start()) {
@@ -488,17 +471,17 @@ Everything that touches components runs through `h.run(...)` (the session execut
 - Unit-test nodes, models and actions without any UI (`NodesTest` in `webbeans-nodes`: key diffs, factories, sheets, actions; `ActionsTest` in `webbeans-actions`: the action kinds over an `InstanceContent` lookup).
 - Lower-level: a `UI` with a recording `Transport` (`UITest`, `ExplorerTest`, `ChartTest`, `Scene3DTest`); window system tests with a `Registry` built from a `RegistrationBuilder` (`WindowManagerTest`); dialogs answered by clicking their buttons (`DialogsTest`); the help system end to end on `HeadlessUI` (`HelpTest`: registry → table of contents, display, F1, dialog buttons, search, the stand-alone page, re-expansion after a restore).
 - `MockServices.setServices(FakeFileService.class)` swaps services in `Lookup.getDefault()` for a test; `WbDefaultLookup.getInstance().setContent(...)` replaces the whole default lookup (HeadlessUI restores it on close).
-- Registry and module tests can build real module jars at test time (`TestModules` in `webbeans-core`'s tests) and run `Platform.start` against a temp data directory.
+- Registry and platform tests can build real jars at test time (`TestJars` in `webbeans-core`'s tests), put them in a `URLClassLoader` and run `Platform.start` against it and a temp data directory.
 - Server tests: `WbServerTest` starts the real Jetty server on port 0 and speaks the protocol over long polling (`HttpURLConnection`) and over a WebSocket (Jetty's `WebSocketClient`); `webbeans-demo/e2e/*.js` (`transport.js` covers the WebSocket, the outage/replay path and the long-poll fallback), `webbeans-tutorial/e2e/tutorial.js`, `workbench/e2e/workbench.js` and `workbench/e2e/help.js` drive Chromium with Playwright (headless WebGL through SwiftShader) through the dock, the explorer, the menus, dialogs, charts, 3D, options, help, persistence, reconnect and roles.
 
 ---
 
 ## 15. Running, configuring, packaging
 
-Run the launcher with the platform jars on the class path and modules in a directory:
+Run the launcher with the platform jars and your application jars on the class path — that is the whole deployment model:
 
 ```
-java -cp 'lib/*' org.webbeans.launcher.Main --modules modules --datadir data --port 8080
+java -cp 'lib/*' org.webbeans.launcher.Main --datadir data --port 8080
 ```
 
 | Flag | Default | Meaning |
@@ -508,7 +491,6 @@ java -cp 'lib/*' org.webbeans.launcher.Main --modules modules --datadir data --p
 | `--https-redirect`, `--no-http` | off | with `--https-port`: redirect plain requests to the HTTPS port, or do not open the plain port at all |
 | `--secure-cookies`, `--trusted-proxy <ip>` | off | behind a TLS-terminating proxy: mark cookies `Secure` and believe `X-Forwarded-For/-Proto/-Host` from that address |
 | `--datadir` | `./data` | users (`system/users.properties`), per-user files, layouts, preferences, registry overlay, cache |
-| `--modules` | none | directory of module jars (class-path jars with a `WebBeans-Module` manifest are found too) |
 | `--branding` | none | bundle overlay name: `Bundle_<name>[_<locale>].properties` next to any bundle wins |
 | `--context` | `/` | serve under a path prefix |
 | `--title` | WebBeans | application title (login page, bootstrap page) |
@@ -517,11 +499,10 @@ java -cp 'lib/*' org.webbeans.launcher.Main --modules modules --datadir data --p
 | `--dev` | off | rebuild the client bundle on every page load, no cache headers |
 | `--admin-password`, `--no-default-admin` | generated | first-start `admin` account |
 | `--no-websocket` | off | long polling only: the page does not try the WebSocket (a proxy that cannot forward the upgrade) |
-| `--no-watch-modules` | off | do not install/uninstall module jars dropped into or removed from `<datadir>/modules` while running (§4) |
 | `--http-threads` | 4 × cores, min 8 | Jetty's thread pool (connections, long polls, socket callbacks; session work runs on its own pool) |
 | `--max-upload` | 256m | largest file `/wb/upload` accepts (`512k`, `10m`, `2g`) |
 
-**Application jar**: one runnable jar that carries the platform, your branding resources and your modules under `WEBBEANS-INF/modules/` (listed in `WEBBEANS-INF/modules.list`). The launcher extracts the modules into `<datadir>/cache/modules` on start (replacing changed ones, removing stale ones) and loads them from there; `--modules` adds a directory on top. `workbench/workbench-app/pom.xml` builds it with `maven-dependency-plugin` (copies the module jars in) and `maven-shade-plugin` (merges the platform, concatenates `META-INF/services`, sets `Main-Class`); `tools/fatjar.py` does the same offline. Deploy with `java -jar myapp.jar --datadir /var/lib/myapp --branding myapp --https-port 443 --keystore /etc/myapp/server.p12 --keystore-password … --https-redirect` (Jetty terminates TLS; convert a PEM certificate and key with `openssl pkcs12 -export -in cert.pem -inkey key.pem -out server.p12`), or behind a TLS-terminating proxy with `--trusted-proxy`. The jar is stateless apart from `--datadir`; the browser bundle hash changes with every build, so clients reload automatically after an upgrade.
+**Application jar**: one runnable jar with the platform, your jars and your branding resources merged. `workbench/workbench-app/pom.xml` builds it with `maven-shade-plugin` (depends on the application jars, merges everything, concatenates `META-INF/services`, sets `Main-Class`); `tools/fatjar.py` does the same offline. Deploy with `java -jar myapp.jar --datadir /var/lib/myapp --branding myapp --https-port 443 --keystore /etc/myapp/server.p12 --keystore-password … --https-redirect` (Jetty terminates TLS; convert a PEM certificate and key with `openssl pkcs12 -export -in cert.pem -inkey key.pem -out server.p12`), or behind a TLS-terminating proxy with `--trusted-proxy`. The jar is stateless apart from `--datadir`; the browser bundle hash changes with every build, so clients reload automatically after an upgrade.
 
 **Transport and proxies**: the browser opens one WebSocket per tab (`/wb/ws`), keeps it alive with a ping every 30 s and reconnects with backoff, replaying the deltas it missed (a tab survives a network blip or a server-side socket timeout without a reload; after two minutes without a connection its UI is closed and the next connect starts fresh). If the first WebSocket attempt never connects, the tab falls back to long polling (`/wb/poll`) by itself — so the application works behind any proxy, just with higher latency. Behind nginx make the upgrade work: `proxy_http_version 1.1; proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade"; proxy_read_timeout 120s;` (Apache: `mod_proxy_wstunnel`). `document.documentElement.dataset.wbState` is `connected`/`reconnecting`/`gone` and `wb.transport.kind` is `ws` or `poll` — handy in the browser console when debugging a deployment. An application that needs more of Jetty (its own servlets, another connector) gets the `org.eclipse.jetty.server.Server` from `WbServer.getJetty()` before `start()` and configures it; the platform's own servlets live in one `ServletContextHandler` at `--context`.
 
@@ -543,7 +524,7 @@ Not there yet: a `webbeans-maven-plugin` (`wb:run`, `wb:package`) and an archety
 | `layer.xml` | annotations only (`@FolderRegistration` for menu/toolbar folders, `@LayoutRegistration` for layouts, `@HelpPage` for help) |
 | `DialogDisplayer.notify` returning a value | `notify(...).thenAccept(...)` |
 | `OptionsPanelController` + `@TopLevelRegistration` | same names in `org.webbeans.options`; `OptionsDisplayer.open()` returns a future |
-| `HelpCtx`, `HelpCtx.Provider`, JavaHelp helpsets (`map.jhm`, `toc.xml`) | `org.webbeans.ui.HelpCtx` (same shape), `@HelpPage` + Markdown/HTML pages in the module |
+| `HelpCtx`, `HelpCtx.Provider`, JavaHelp helpsets (`map.jhm`, `toc.xml`) | `org.webbeans.ui.HelpCtx` (same shape), `@HelpPage` + Markdown/HTML pages in the jar |
 | `NotificationDisplayer`, `ProgressHandle`, `StatusDisplayer` | same names; session-wide, any thread |
 | `SwingUtilities.invokeLater` / EDT | `ui.access(...)` / session executor |
 | `Node.Cookie`, `OpenCookie` | `getLookup()` capabilities, `Openable` |
@@ -559,3 +540,4 @@ Not there yet: a `webbeans-maven-plugin` (`wb:run`, `wb:package`) and an archety
 | Java 3D / JOGL / JavaFX 3D | `org.webbeans.scene3d.Scene3D` (server-side scene graph, three.js renderer) |
 | NetBeans' `NbModuleSuite` tests | `HeadlessUI` |
 | `Lookup`, `@ServiceProvider`, `RequestProcessor`, `WeakListeners` | **unchanged** (NetBeans libraries) |
+| Module manifests (`OpenIDE-Module`, dependencies, public packages), `ModuleInstall` | none — the class path is the application; `Installer` (via `@ServiceProvider`) for `restored()`/`closing()`/`close()` |

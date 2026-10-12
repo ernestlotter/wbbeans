@@ -1,6 +1,6 @@
 # WebBeans User's Guide for Developers
 
-*A step-by-step introduction to the UI components, the platform patterns and the way a WebBeans application is put together. Every example compiles and runs: the small ones are the `webbeans-tutorial` module (`webbeans-tutorial/src/main/java/org/webbeans/tutorial`, built and tested by `./build.sh` and loaded next to the demo), the larger ones are taken verbatim from the **Workbench** sample application (`workbench/`) and the demo (`webbeans-demo/`). All code is Java 8.*
+*A step-by-step introduction to the UI components, the platform patterns and the way a WebBeans application is put together. Every example compiles and runs: the small ones are the `webbeans-tutorial` jar (`webbeans-tutorial/src/main/java/org/webbeans/tutorial`, built and tested by `./build.sh` and on the class path next to the demo), the larger ones are taken verbatim from the **Workbench** sample application (`workbench/`) and the demo (`webbeans-demo/`). All code is Java 8.*
 
 Companion documents: the **Developer Guide** (`docs/developer-guide.md`) explains the concepts in depth; the **Component Guide** (`docs/component-guide.md`) is the per-component reference. This guide is the path through them.
 
@@ -8,7 +8,7 @@ Companion documents: the **Developer Guide** (`docs/developer-guide.md`) explain
 
 ## 0. Before you start
 
-**What WebBeans is.** A rich-client platform in the spirit of the NetBeans Platform, where *everything* is server-side Java: windows, components, menus, dialogs, nodes, charts and 3D scenes are Java objects living in a per-user session on the server. A small generated JavaScript client renders them in the browser and sends events back. You never write JavaScript; you write modules.
+**What WebBeans is.** A rich-client platform in the spirit of the NetBeans Platform, where *everything* is server-side Java: windows, components, menus, dialogs, nodes, charts and 3D scenes are Java objects living in a per-user session on the server. A small generated JavaScript client renders them in the browser and sends events back. You never write JavaScript; you write ordinary Java jars, and whatever is on the class path is the application.
 
 **The three ideas you will use on every page of this guide:**
 
@@ -19,20 +19,19 @@ Companion documents: the **Developer Guide** (`docs/developer-guide.md`) explain
 **Build and run.** From the repository root:
 
 ```bash
-./build.sh                       # compiles every module with javac --release 8, runs the JUnit tests (~140)
-# the demo + the tutorial module:
-java -cp 'build/dist/lib/*' org.webbeans.launcher.Main --modules build/dist/modules --datadir data --port 8080
-# the Workbench application (one jar, modules embedded):
+./build.sh                       # compiles every project for Java 8, runs the JUnit tests
+# the demo + the tutorial (both jars are in build/dist/lib with the platform):
+java -cp 'build/dist/lib/*' org.webbeans.launcher.Main --datadir data --port 8080
+# the Workbench application (one merged jar):
 cd build/workbench-dist && ./workbench.sh            # http://localhost:8080, alice/secret (admin) or bob/secret
 ```
 
-The demo's first start prints a generated `admin` password (or pass `--admin-password …`). Log in and you will see the main window: menu bar, toolbars, the dock with the open windows, the status bar. Everything you see was produced by annotations in the modules under `build/dist/modules`.
+The demo's first start prints a generated `admin` password (or pass `--admin-password …`). Log in and you will see the main window: menu bar, toolbars, the dock with the open windows, the status bar. Everything you see was produced by annotations in the jars on the class path.
 
-**Anatomy of a module.** A module is a jar with a manifest and (usually) nothing else special:
+**Anatomy of an application jar.** Nothing special: an ordinary jar whose classes carry the WebBeans annotations. The annotation processor turns them into `META-INF/services` entries at compile time, and the platform reads those from every jar on the class path at start-up — there is no manifest, no descriptor and no module system.
 
 ```
 webbeans-tutorial/
-  src/main/resources/META-INF/MANIFEST.MF
   src/main/java/org/webbeans/tutorial/*.java       # Bundle.properties is generated next to them by @Messages
   src/main/java/org/webbeans/tutorial/package-info.java   # package-level registrations (help pages)
   src/main/resources/org/webbeans/tutorial/*.svg    # icons
@@ -40,15 +39,7 @@ webbeans-tutorial/
   src/test/java/org/webbeans/tutorial/TutorialTest.java
 ```
 
-```
-Manifest-Version: 1.0
-WebBeans-Module: org.webbeans.tutorial
-WebBeans-Module-Version: 1.0.0
-WebBeans-Module-Display-Name: Tutorial
-WebBeans-Module-Public-Packages: -
-```
-
-`WebBeans-Module-Dependencies: org.webbeans.workbench.core > 1.0` declares dependencies on other modules, `WebBeans-Module-Public-Packages` what they may use, `WebBeans-Module-Install` a `ModuleInstall` subclass with lifecycle hooks (the Workbench's `WorkbenchInstaller` seeds the demo accounts). Compile with the three annotation processors on the processor path and `-Awebbeans.module=<code name>` (see `build.sh` or any module `pom.xml`); drop the jar into the `--modules` directory and restart.
+Compile with the three annotation processors on the processor path and `-Awebbeans.module=<name>` (the package of the generated registrations class; see `build.sh`, `examples/hello/pom.xml` or any project `pom.xml`); put the jar on the class path and start. An `Installer` subclass registered with `@ServiceProvider(service = Installer.class)` gets `restored()` at start-up and `closing()`/`close()` at shutdown (the Workbench's `WorkbenchInstaller` seeds the demo accounts). Jars depend on each other the ordinary Maven way; the smallest complete application is `examples/hello` (a pom and one action class).
 
 ---
 
@@ -110,7 +101,7 @@ Build, restart, log in: the window is there, with a *Window ▸ Hello* entry. Ty
 
 ## 2. Components, values and events
 
-The `ContactTopComponent` of the tutorial module uses most of the input components at once (open it with *Window ▸ New contact*):
+The tutorial's `ContactTopComponent` uses most of the input components at once (open it with *Window ▸ New contact*):
 
 ```java
 private final TextField name = new TextField();
@@ -504,7 +495,7 @@ private void setDirty(boolean m) {
 
 ### 6.2 Where it docks: modes and your own
 
-`mode = "explorer" | "navigator" | "editor" | "properties" | "output"` picks a standard mode. The Workbench admin module adds its own bottom mode and docks there:
+`mode = "explorer" | "navigator" | "editor" | "properties" | "output"` picks a standard mode. The Workbench's admin jar adds its own bottom mode and docks there:
 
 ```java
 @Mode.Registration(name = "admin", side = Mode.Side.BOTTOM, defaultSize = 180, position = 200)
@@ -514,7 +505,7 @@ private void setDirty(boolean m) {
 public final class ServerStatusTopComponent extends TopComponent implements ExplorerManager.Provider { … }
 ```
 
-`roles = {"admin"}` hides the window *and* its Window-menu entry from users without the role (role checks happen on the server, per registry entry). `persistenceType` says whether the window is restored at the next login: `PERSISTENCE_ALWAYS` (default), `PERSISTENCE_ONLY_OPENED`, `PERSISTENCE_NEVER`. Users rearrange the dock by dragging; the layout is saved per user. A module can ship a default layout per role: `@LayoutRegistration(role = "admin", resource = "org/webbeans/workbench/admin/layouts/admin.json")` (see `AdminLayout`). The platform's Help window uses the same mechanism for a `help` mode of its own on the right.
+`roles = {"admin"}` hides the window *and* its Window-menu entry from users without the role (role checks happen on the server, per registry entry). `persistenceType` says whether the window is restored at the next login: `PERSISTENCE_ALWAYS` (default), `PERSISTENCE_ONLY_OPENED`, `PERSISTENCE_NEVER`. Users rearrange the dock by dragging; the layout is saved per user. A jar can ship a default layout per role: `@LayoutRegistration(role = "admin", resource = "org/webbeans/workbench/admin/layouts/admin.json")` (see `AdminLayout`). The platform's Help window uses the same mechanism for a `help` mode of its own on the right.
 
 ### 6.3 Many instances of one window: editors
 
@@ -575,7 +566,7 @@ associateLookup(new AbstractLookup(content));
 content.set(Collections.singleton(c), null);      // in the chart's click listener
 ```
 
-**Pattern — lookup in, actions out.** Windows publish objects; actions declare which object they need. Neither knows the other's class. This is what lets a *Files* window from one module and a *Save* action from another cooperate, and what keeps `FileActions` free of any reference to the editor.
+**Pattern — lookup in, actions out.** Windows publish objects; actions declare which object they need. Neither knows the other's class. This is what lets a *Files* window from one jar and a *Save* action from another cooperate, and what keeps `FileActions` free of any reference to the editor.
 
 ---
 
@@ -676,7 +667,7 @@ public final class TaskNode extends AbstractNode {
     }
 
     @Override
-    public Action[] getActions(boolean context) {                // the popup: whatever modules registered under Tasks/Actions
+    public Action[] getActions(boolean context) {                // the popup: whatever was registered under Tasks/Actions
         List<Action> all = Actions.forPath(ACTIONS_FOLDER);
         return all.toArray(new Action[all.size()]);
     }
@@ -849,7 +840,7 @@ The rules:
 
 - **No-arg constructor → always enabled.** **Constructor with `T` → enabled when the global context has exactly one `T`; `List<T>` → one or more.** The platform instantiates the class on invocation with the objects from the context. `surviveFocusChange = true` keeps the last context while a non-context window (a toolbar, a dialog) has focus — the Workbench *Save* uses it so Ctrl+S works after clicking the toolbar.
 - `@ActionReference(path = "Menu/<menu>")`, `"Toolbars/<toolbar>"`, `"Shortcuts"` and any folder your nodes read with `Actions.forPath(...)`. `position` orders, `separatorBefore/After` draw separators. Shortcut names follow NetBeans: `D-S` (Ctrl/Cmd+S), `DS-T` (Ctrl+Shift+T), `F5`, `F1`.
-- A toolbar or menu is a registry folder; declare it once with `@FolderRegistration(path = "Toolbars/Tasks", displayName = "#CTL_TasksToolbar", position = 500)` (on any class of the module — `TaskActions` carries it). The standard menus are `Menu/File, Edit, View, Tools, Window, Help`.
+- A toolbar or menu is a registry folder; declare it once with `@FolderRegistration(path = "Toolbars/Tasks", displayName = "#CTL_TasksToolbar", position = 500)` (on any class — `TaskActions` carries it). The standard menus are `Menu/File, Edit, View, Tools, Window, Help`.
 - `roles = {"admin"}` on `@ActionRegistration` hides the action from other users (`EndSessionAction`). `asynchronous = true` runs `actionPerformed` off the session thread with a progress indicator (the demo's `ScanAction`).
 
 **Invoking an action from code**: `Actions.forID("Tasks", "org.webbeans.tutorial.AddTaskAction")` returns the action; `Actions.invoke(action, source, context)` runs it (tests do this). `Actions.forPath("Tasks/Actions")` returns the folder's actions for a popup.
@@ -858,7 +849,7 @@ The rules:
 
 **Quick Search (Ctrl+I)**: every menu action, open window and help topic is reachable by typing part of its name (or its initials: "ot" → *Open Toolbars*). Contribute your own results with a `QuickSearchProvider` registered under `QuickSearch/Providers` — `getCategory()` for the heading and `search(query, response)` adding `(displayName, detail, icon, Runnable)` results — the Workbench could offer files and parts this way.
 
-**Pattern — register in folders, not on windows.** `TaskNode` asks `Actions.forPath("Tasks/Actions")`; it does not list its actions. Any module can add a popup entry without touching the node — the Workbench *Files* popup, *Parts* popup and *Scene3D* viewport toolbar all work this way.
+**Pattern — register in folders, not on windows.** `TaskNode` asks `Actions.forPath("Tasks/Actions")`; it does not list its actions. Any jar can add a popup entry without touching the node — the Workbench *Files* popup, *Parts* popup and *Scene3D* viewport toolbar all work this way.
 
 ---
 
@@ -1037,7 +1028,7 @@ Animation runs in the browser: `rotor.animate(Animation.rotate(Axis.Z, 1.2))`, `
 ### 12.2 The session bus: publish/subscribe across windows and tabs
 
 ```java
-// publisher (any module): the Workbench's Log helper
+// publisher (anywhere): the Workbench's Log helper
 UISession.current().publish(new LogMessage(LogMessage.Level.INFO, "files", "Saved README.md"));
 
 // subscriber: the Output window, in componentOpened
@@ -1047,7 +1038,7 @@ subscription = getUI().getSession().subscribe(LogMessage.class, new Consumer<Log
 // … and subscription.remove() in componentClosed
 ```
 
-`LogMessage` is the only class the Workbench modules share (it lives in the core module's public package `org.webbeans.workbench.core.api`). The Output window of *every* tab of the user shows the line — the subscriber runs on the session thread, for each UI.
+`LogMessage` is the only class the Workbench jars share (it lives in `workbench-core`, package `org.webbeans.workbench.core.api`, which the other projects depend on). The Output window of *every* tab of the user shows the line — the subscriber runs on the session thread, for each UI.
 
 ### 12.3 Push from a background thread
 
@@ -1112,7 +1103,7 @@ Administrators get the `SessionDirectory` service (`getSessions()`, `invalidate(
 - The session locale: `UISession.current().getLocale()`; `session.setLocale(new Locale("de"))` switches it live — menus, toolbars and dialogs relabel themselves, open windows get `localeChanged()`, and anything else listens for `UISession.LocaleChangeEvent` on the bus (the status cell above). `WorkbenchOptions` stores the choice; `SessionSetup` applies it at login.
 - Formatting: use `DateFormat`/`NumberFormat` with the session locale (`OutputTopComponent.append`), never the JVM default.
 - Help pages: a `page_de.md` next to `page.md` is served to German sessions (§15).
-- Branding: `--branding workbench` makes the platform look up `Bundle_workbench.properties` before `Bundle.properties` for *every* module, so an application can rename platform strings (*Help* → *Workbench Help*) without forking them.
+- Branding: `--branding workbench` makes the platform look up `Bundle_workbench.properties` before `Bundle.properties` everywhere, so an application can rename platform strings (*Help* → *Workbench Help*) without forking them.
 
 ---
 
@@ -1171,10 +1162,10 @@ The toolbox: `HeadlessUI.start()` (user `alice`, role `user`) or `HeadlessUI.bui
 
 ## 15. Help pages
 
-Users press **F1** in a window, click **Help** in a dialog, or open **Help ▸ Help Contents**; the Help window (its own area on the right) shows a page, with a table of contents, search, Back and *Open in new tab*. A page is a Markdown file in your module, registered with `@HelpPage` — the tutorial's `package-info.java`:
+Users press **F1** in a window, click **Help** in a dialog, or open **Help ▸ Help Contents**; the Help window (its own area on the right) shows a page, with a table of contents, search, Back and *Open in new tab*. A page is a Markdown file in your jar, registered with `@HelpPage` — the tutorial's `package-info.java`:
 
 ```java
-/** The tutorial module of the user's guide — and its help page. */
+/** The tutorial of the user's guide — and its help page. */
 @HelpPage(id = "tutorial", title = "#HLP_Tutorial", resource = "org/webbeans/tutorial/help/tutorial.md", position = 500, keywords = "#KW_Tutorial")
 @Messages({"HLP_Tutorial=Tutorial windows", "KW_Tutorial=hello, contact, tasks, guide"})
 package org.webbeans.tutorial;
@@ -1188,7 +1179,7 @@ And the page, `src/main/resources/org/webbeans/tutorial/help/tutorial.md`:
 ```markdown
 # Tutorial windows
 
-The windows of the tutorial module follow the **User's Guide** (`docs/user-guide.md`):
+The windows of the tutorial follow the **User's Guide** (`docs/user-guide.md`):
 
 | Window | Guide section |
 |--------|---------------|
@@ -1211,15 +1202,15 @@ F1 shows the active window's page; a window without a `helpId` gets the **home p
 ### 15.2 Writing pages
 
 - **Markdown** (`.md`): headings, paragraphs, lists, tables, code, links, images, block quotes; inline HTML such as `<kbd>` passes through. An `.html` fragment works too. Everything is sanitised before it reaches the browser.
-- **A tree of pages**: `parent = "files"` nests a page under another (`files.editor` under `files`); `position` orders siblings. Pages registered by *different* modules can nest under each other — the Workbench modules all hang their pages under the core's `workbench` page:
+- **A tree of pages**: `parent = "files"` nests a page under another (`files.editor` under `files`); `position` orders siblings. Pages registered by *different* jars can nest under each other — the Workbench jars all hang their pages under the core's `workbench` page:
 
 ```java
 @HelpPage(id = "files", parent = "workbench", title = "#HLP_Files", resource = "org/webbeans/workbench/files/help/files.md", position = 100, keywords = "#KW_Files")
 @HelpPage(id = "files.editor", parent = "files", title = "#HLP_Editor", resource = "org/webbeans/workbench/files/help/editor.md", position = 100)
 ```
 
-- **Links**: link to another page's *file* relatively — `[The editor](editor.md)`, or across modules `[Files](../../files/help/files.md)` — and the platform turns it into a link to that page's id; `help:files.editor` works too, and `#heading` anchors (the heading's id is its slug: *Working with files* → `working-with-files`). External links open a new browser tab.
-- **Images**: `![diagram](pictures/flow.png)` next to the page; served from the module jar.
+- **Links**: link to another page's *file* relatively — `[The editor](editor.md)`, or across jars `[Files](../../files/help/files.md)` — and the platform turns it into a link to that page's id; `help:files.editor` works too, and `#heading` anchors (the heading's id is its slug: *Working with files* → `working-with-files`). External links open a new browser tab.
+- **Images**: `![diagram](pictures/flow.png)` next to the page; served from the jar.
 - **Translations**: `tutorial_de.md` next to `tutorial.md` is used for German sessions; titles and keywords come from the bundle (`#HLP_Tutorial`).
 - **Roles**: `roles = "admin"` hides a page from everyone else — in the table of contents, in search and on the stand-alone page (the Workbench's *Server Status* page).
 - **Search** matches the title and keywords first, then the page text, so give pages a few `keywords` the title does not contain.
@@ -1228,7 +1219,7 @@ F1 shows the active window's page; a window without a `helpId` gets the **home p
 
 `GET /wb/help/<id>` serves any page as a complete HTML document with the table of contents — for a bookmark, a browser tab of its own or printing — to signed-in users, with the same role filtering and language. The *Open in new tab* link of the Help window points there. The platform ships one page of its own, *Getting around* (`help:platform`), about windows, menus, shortcuts and options; link to it from your overview.
 
-**Pattern — write the help where the feature lives.** Each Workbench module registers its own pages next to its code and tests; the core module's overview links to them by file. Adding a module adds its help; removing it removes the pages and the links to them stop short rather than break the build.
+**Pattern — write the help where the feature lives.** Each Workbench jar registers its own pages next to its code and tests; the core's overview links to them by file. Adding a jar adds its help; removing it removes the pages and the links to them stop short rather than break the build.
 
 ---
 
@@ -1236,13 +1227,13 @@ F1 shows the active window's page; a window without a `helpId` gets the **home p
 
 The Workbench shows the whole chain:
 
-1. **Modules** — one jar each (`workbench-core`, `files`, `dashboard`, `viewer3d`, `admin`), depending on the platform jars and on each other through the manifest.
+1. **Jars** — one each (`workbench-core`, `files`, `dashboard`, `viewer3d`, `admin`), depending on the platform jars and on `workbench-core` through Maven.
 2. **Branding resources** — `workbench-app/src/main/resources/org/webbeans/actions/Bundle_workbench.properties` (and `_de`) override platform strings.
-3. **The application jar** — `tools/fatjar.py` (or the `maven-shade-plugin` in `workbench-app/pom.xml`) packs the platform, the branding resources and the module jars (`WEBBEANS-INF/modules/*.jar` + `modules.list`) into one `workbench.jar`; the launcher extracts the modules into `<datadir>/cache/modules` on start.
-4. **Start script** — `workbench.sh`: `java -jar workbench.jar --branding workbench --title Workbench --datadir data --port 8080`. Other launcher options: `--host`, `--context /path`, `--locale`, `--session-timeout`, `--modules <dir>` (extra modules), `--admin-password`, `--https-port 8443 --keystore server.p12 --keystore-password …` (TLS in the server; `--https-redirect` for plain requests), or `--secure-cookies`, `--trusted-proxy` behind a reverse proxy. Modules can be added while the application runs: drop a module jar into `data/modules` (or use *Tools ▸ Modules…* as an administrator) and it is installed, its windows open and its menu items appear in every signed-in session; delete the jar to uninstall it.
-5. **Data** — `<datadir>/system` (accounts, server state), `<datadir>/users/<name>/<module>` (preferences, layouts, the files module's working directory).
+3. **The application jar** — `tools/fatjar.py` (or the `maven-shade-plugin` in `workbench-app/pom.xml`) merges the platform, the Workbench jars and the branding resources into one `workbench.jar` (`META-INF/services` files concatenated).
+4. **Start script** — `workbench.sh`: `java -jar workbench.jar --branding workbench --title Workbench --datadir data --port 8080`. Other launcher options: `--host`, `--context /path`, `--locale`, `--session-timeout`, `--admin-password`, `--https-port 8443 --keystore server.p12 --keystore-password …` (TLS in the server; `--https-redirect` for plain requests), or `--secure-cookies`, `--trusted-proxy` behind a reverse proxy. Adding or upgrading application code means replacing jars on the class path and restarting.
+5. **Data** — `<datadir>/system` (accounts, server state), `<datadir>/users/<name>/<package>` (preferences, layouts, the files jar's working directory).
 
-To start your own application: copy `workbench/` (Developer Guide §1.2), rename the code names, delete the modules you do not need, keep `workbench-core` as the place for your shared API and installer.
+To start your own application: copy `workbench/` (Developer Guide §1.2) or `examples/hello`, rename the packages, delete the projects you do not need, keep `workbench-core` as the place for your shared API and installer.
 
 ---
 
@@ -1262,9 +1253,9 @@ To start your own application: copy `workbench/` (Developer Guide §1.2), rename
 | Bind collections with `Children.Keys` / `ChildFactory` / `SceneBinder` | §7.2, §11 |
 | Share across windows and tabs on the session bus | §12.2, `LogMessage` |
 | Test through the user's door with `HeadlessUI` | §14 |
-| Write the help where the feature lives: `@HelpPage` + `helpId` per module | §15, `workbench/*/package-info.java` |
+| Write the help where the feature lives: `@HelpPage` + `helpId` per jar | §15, `workbench/*/package-info.java` |
 | Declare validation on the component, aggregate with `Form`: min/max, required and formats are platform rules with localised messages; `form.enable(save)` and `form.validate()` replace hand-written enablement | §2.4, `GalleryTopComponent` |
 | Let enums describe themselves (`Labeled`, a bundle line, `EnumLabels.register`) and every list, cell and editor shows the label and icon | §2.6, `Planet.Type` |
 | Gestures arrive as events; the component applies what it owns and reports what you own | §6b, `BoardsTopComponent` |
 
-Where next: the Developer Guide for modules, threading and the protocol in depth; the Component Guide when you need a property name; `design/*.md` for the why.
+Where next: the Developer Guide for services, threading and the protocol in depth; the Component Guide when you need a property name; `design/*.md` for the why.

@@ -246,7 +246,7 @@ public final class Actions {
     }
 
     private static Class<?> load(Entry e, String name) {
-        ClassLoader l = e.getModule() != null ? e.getModule().getClassLoader() : Lookup.getDefault().lookup(ClassLoader.class);
+        ClassLoader l = e.getClassLoader() != null ? e.getClassLoader() : Lookup.getDefault().lookup(ClassLoader.class);
         if (l == null) {
             l = Actions.class.getClassLoader();
         }

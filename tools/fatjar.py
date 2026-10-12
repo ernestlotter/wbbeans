@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""Builds an application jar: merges platform jars (concatenating META-INF/services/*), adds application
-resources (branding bundles), embeds module jars under WEBBEANS-INF/modules/ with a modules.list, and writes a
-manifest with Main-Class org.webbeans.launcher.Main. Offline stand-in for maven-shade-plugin.
+"""Builds an application jar: merges the platform and application jars (concatenating META-INF/services/*),
+adds application resources (branding bundles) and writes a manifest with Main-Class
+org.webbeans.launcher.Main. Offline stand-in for maven-shade-plugin.
 
-usage: fatjar.py OUT.jar --lib a.jar b.jar ... --modules m1.jar m2.jar ... [--resources DIR ...]
+usage: fatjar.py OUT.jar --lib a.jar b.jar ... [--resources DIR ...]
 """
 import os, sys, zipfile
 
 def main(argv):
-    out = argv[1]; mode = None; libs = []; mods = []; res = []
+    out = argv[1]; mode = None; libs = []; res = []
     for a in argv[2:]:
-        if a in ('--lib', '--modules', '--resources'): mode = a; continue
-        {'--lib': libs, '--modules': mods, '--resources': res}[mode].append(a)
+        if a in ('--lib', '--resources'): mode = a; continue
+        {'--lib': libs, '--resources': res}[mode].append(a)
     services = {}
     seen = set()
     with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
@@ -43,12 +43,7 @@ def main(argv):
                     full = os.path.join(root, f); rel = os.path.relpath(full, d).replace(os.sep, '/')
                     if rel in seen: continue
                     seen.add(rel); z.write(full, rel)
-        names = []
-        for m in mods:
-            base = os.path.basename(m); names.append(base)
-            z.write(m, 'WEBBEANS-INF/modules/' + base)
-        z.writestr('WEBBEANS-INF/modules.list', '\n'.join(names) + '\n')
-    print('wrote', out, 'with', len(seen), 'entries and', len(names), 'embedded modules')
+    print('wrote', out, 'with', len(seen), 'entries')
 
 if __name__ == '__main__':
     main(sys.argv)

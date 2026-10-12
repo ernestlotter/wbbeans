@@ -448,23 +448,6 @@ public final class UISession implements Lookup.Provider {
     }
 
     /** Published on the session bus when the locale changes. */
-    /**
-     * Published to every live session when modules were enabled, disabled, installed or removed and the registry
-     * was rebuilt: menus, toolbars and windows re-read it, and when {@link #isClientChanged()} the page's
-     * JavaScript bundle is out of date (new or removed renderers) and a reload is advisable.
-     */
-    public static final class RegistryChangedEvent {
-        private final boolean clientChanged;
-
-        public RegistryChangedEvent(boolean clientChanged) {
-            this.clientChanged = clientChanged;
-        }
-
-        public boolean isClientChanged() {
-            return clientChanged;
-        }
-    }
-
     public static final class LocaleChangeEvent {
         private final Locale oldLocale;
         private final Locale newLocale;

@@ -5,7 +5,7 @@
 | Document | Scope | Status |
 |---|---|---|
 | `design/webbeans-architecture.md` | Overall architecture, decisions, roadmap, change log | v0.7 |
-| `design/module-system-and-lookup.md` | Step 1: modules, class loading, Registry, NetBeans Lookup/i18n integration, annotation processor | v0.2 |
+| `design/module-system-and-lookup.md` | Step 1 (revised in step 14): the class path as the application, Registry, NetBeans Lookup/i18n integration, annotation processor, `Installer` hooks | v0.4 |
 | `design/sessions-and-delta-protocol.md` | Steps 2, 10: Jetty HTTP surface, auth, sessions/UIs, threading, component model, wire protocol over WebSocket and long polling, `wb-core.js` | v0.3 |
 | `design/standard-components.md` | Steps 2, 11, 12: the standard component library as built — inputs, Form, layouts, SplitPane/ScrollPane, Table, ListBox, Tree, Upload, downloads; tier-2/3: small widgets, Card/Accordion/Popover, TreeTable, PropertyGrid, code/Markdown/diff/output views, Calendar, Kanban, Diagram/Palette, viewers, Quick Search | v0.3 |
 | `design/window-system.md` | Step 3: TopComponent, Mode, WindowManager, layout model, dock renderer | v0.2 |

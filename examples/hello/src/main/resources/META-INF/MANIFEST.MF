@@ -1,5 +1,0 @@
-Manifest-Version: 1.0
-WebBeans-Module: com.example.hello
-WebBeans-Module-Version: 1.0.0
-WebBeans-Module-Display-Name: Hello
-WebBeans-Module-Public-Packages: -

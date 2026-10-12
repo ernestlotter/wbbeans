@@ -1,4 +1,4 @@
-package org.webbeans.core.modules;
+package org.webbeans.core;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -26,30 +26,23 @@ import javax.tools.JavaFileObject;
 import javax.tools.SimpleJavaFileObject;
 import javax.tools.ToolProvider;
 
-/** Test helper: builds module descriptors and module jars (with compiled classes) on the fly. */
-public final class TestModules {
+/** Test helper: builds jars with compiled classes and resources on the fly (an application jar on the class path). */
+public final class TestJars {
 
-    private TestModules() {
+    private TestJars() {
     }
 
-    /** A descriptor without a jar, for resolver tests. Attributes alternate name/value after the version. */
-    public static ModuleInfo info(String codeName, String version, String... attrs) {
-        return ModuleInfo.fromManifest(manifest(codeName, version, attrs), null);
-    }
-
-    public static Manifest manifest(String codeName, String version, String... attrs) {
+    public static Manifest manifest(String... attrs) {
         Manifest mf = new Manifest();
         Attributes a = mf.getMainAttributes();
         a.put(Attributes.Name.MANIFEST_VERSION, "1.0");
-        a.putValue(ModuleInfo.ATTR_MODULE, codeName);
-        a.putValue(ModuleInfo.ATTR_VERSION, version);
         for (int i = 0; i + 1 < attrs.length; i += 2) {
             a.putValue(attrs[i], attrs[i + 1]);
         }
         return mf;
     }
 
-    /** Builder for a module jar with Java sources compiled into it. */
+    /** Builder for a jar with Java sources compiled into it. */
     public static final class Jar {
         private final String codeName;
         private final String version;
@@ -67,18 +60,6 @@ public final class TestModules {
             attrs.add(name);
             attrs.add(value);
             return this;
-        }
-
-        public Jar dependsOn(String deps) {
-            return attr(ModuleInfo.ATTR_DEPENDENCIES, deps);
-        }
-
-        public Jar exports(String packages) {
-            return attr(ModuleInfo.ATTR_PUBLIC_PACKAGES, packages);
-        }
-
-        public Jar install(String fqcn) {
-            return attr(ModuleInfo.ATTR_INSTALL, fqcn);
         }
 
         /** @param fqcn fully qualified class name; the source must declare the matching package */
@@ -101,8 +82,7 @@ public final class TestModules {
         public File build(File dir) throws IOException {
             Map<String, byte[]> classes = compile();
             File jar = new File(dir, codeName + "-" + version + ".jar");
-            JarOutputStream out = new JarOutputStream(new FileOutputStream(jar),
-                    manifest(codeName, version, attrs.toArray(new String[0])));
+            JarOutputStream out = new JarOutputStream(new FileOutputStream(jar), manifest(attrs.toArray(new String[0])));
             try {
                 for (Map.Entry<String, byte[]> e : classes.entrySet()) {
                     out.putNextEntry(new JarEntry(e.getKey()));

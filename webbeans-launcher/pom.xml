@@ -42,11 +42,6 @@
     </dependency>
     <dependency>
       <groupId>org.webbeans</groupId>
-      <artifactId>webbeans-modules</artifactId>
-      <scope>runtime</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.webbeans</groupId>
       <artifactId>webbeans-charts</artifactId>
       <scope>runtime</scope>
     </dependency>

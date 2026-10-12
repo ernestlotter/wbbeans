@@ -105,8 +105,8 @@ public final class Bundler {
     }
 
     private ClassLoader loader(Entry e) {
-        if (e != null && e.getModule() != null && e.getModule().getClassLoader() != null) {
-            return e.getModule().getClassLoader();
+        if (e != null && e.getClassLoader() != null) {
+            return e.getClassLoader();
         }
         ClassLoader system = Lookup.getDefault().lookup(ClassLoader.class);
         return system != null ? system : fallback;

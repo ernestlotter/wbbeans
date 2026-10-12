@@ -1,6 +1,6 @@
-# WebBeans — Architecture Design v0.7
+# WebBeans — Architecture Design v0.8
 
-A rich web application platform modelled on the NetBeans Platform. All application code — UI definition, modules, business logic — is server-side Java (JDK 8). The browser runs a thin, generated JavaScript runtime that mirrors the server-side component tree.
+A rich web application platform modelled on the NetBeans Platform. All application code — UI definition, business logic — is server-side Java (JDK 8) on the class path. The browser runs a thin, generated JavaScript runtime that mirrors the server-side component tree.
 
 Document map: `design/README.md` lists every design document and the developer docs.
 
@@ -17,13 +17,13 @@ Document map: `design/README.md` lists every design document and the developer d
 | i18n | NetBeans `org-openide-util`: `Bundle.properties`, `@Messages`, `NbBundle`; locale per session |
 | Browser tabs | Multiple `UI` instances per `UISession`, each with its own window layout |
 | Lookup | NetBeans `org-openide-util-lookup` (RELEASE126) used as-is, not re-implemented |
-| Registration | Annotations only; no `layer.xml`. The processor generates a Java `RegistrationProvider` per module feeding a path-keyed `Registry` |
+| Registration | Annotations only; no `layer.xml`. The processor generates a Java `RegistrationProvider` per jar feeding a path-keyed `Registry` |
 
 ## 2. Layer overview
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│ Application modules (user code)                          │
+│ Application jars (user code)                             │
 ├──────────────────────────────────────────────────────────┤
 │ Platform APIs: Window System · Explorer/Nodes · Actions  │
 │                Options · Dialogs · Charts · Scene3D      │
@@ -31,7 +31,7 @@ Document map: `design/README.md` lists every design document and the developer d
 │ UI Core: Component tree · Properties · Events · Deltas   │
 │          Standard component library                      │
 ├──────────────────────────────────────────────────────────┤
-│ Runtime: Module System · Registry · Sessions · Auth      │
+│ Runtime: Class path · Registry · Sessions · Auth         │
 │          NetBeans util-lookup + util (Lookup, NbBundle)  │
 ├──────────────────────────────────────────────────────────┤
 │ Transport: WebSocket · long-poll fallback · Bundler ·    │
@@ -48,22 +48,15 @@ Document map: `design/README.md` lists every design document and the developer d
 
 Packages: `org.webbeans.core.*` (runtime), `org.webbeans.ui.*` (component model and standard components), `org.webbeans.api.*` (platform APIs), `org.webbeans.modules.*` (shipped modules). NetBeans packages reused: `org.openide.util.*`, `org.openide.util.lookup.*`.
 
-## 3. Module system and registry
+## 3. Class path and registry
 
-A module is a jar with `META-INF/MANIFEST.MF` entries:
+The application is the JVM class path (as of step 14; the module system of steps 1–13 — manifests, dependency resolution, per-module class loaders, enable/disable, run-time installation — was removed). An application jar is an ordinary jar; what it contributes is in its `META-INF/services`, written at compile time by the annotation processors:
 
-```
-WebBeans-Module: org.example.accounts
-WebBeans-Module-Version: 1.2.0
-WebBeans-Module-Dependencies: org.webbeans.api.windows > 1.0, org.webbeans.api.explorer > 1.0
-WebBeans-Module-Install: org.example.accounts.Installer
-```
-
-- **Resolution**: topological sort over declared dependencies; version check (`>` = at least, `=` = exact); unresolved modules are disabled with a logged reason, never a hard failure of the platform.
-- **Class loading**: one `ModuleClassLoader` per module, parent = platform loader, siblings visible only through declared dependencies (NetBeans semantics). Public packages are declared with `WebBeans-Module-Public-Packages`.
-- **Lifecycle**: `ModuleInstall { validate(); restored(); closing(); close(); }`, called in dependency order.
+- **Discovery**: `Platform.start` reads every `RegistrationProvider` the class loader can see into the registry (class-path order; later jars win conflicts, `@Hide` masks deliberately) and every `@ServiceProvider` into `Lookup.getDefault()`.
+- **Lifecycle**: `Installer { restored(); closing(); close(); }`, registered with `@ServiceProvider`, called in Lookup order at start-up and in reverse at shutdown.
+- **No isolation, no versions**: jars see each other; dependencies and versions are Maven's concern; a change of application code is a restart.
 - **Registry**: a shared, immutable, path-keyed registry (`Actions/File`, `Menu/File`, `Toolbars/Main`, `Windows/Modes`, `Windows/Components`, `Services/Session`) with `position` ordering, cross-module masking and a per-user hide/reorder overlay — the useful part of NetBeans layers without XML or a virtual filesystem.
-- **Annotations → registry**: the `webbeans-processor` (JDK 8 `javax.annotation.processing`) turns `@ActionID`, `@ActionRegistration`, `@ActionReference`, `@TopComponent.Registration`, `@Mode.Registration`, `@NodeFactory.Registration`, `@Renderer`, `@Registration` into a generated `WbRegistrations` class per module (type-safe factories, no reflection). `@ServiceProvider` and `@Messages` are NetBeans' own.
+- **Annotations → registry**: the `webbeans-processor` (JDK 8 `javax.annotation.processing`) turns `@ActionID`, `@ActionRegistration`, `@ActionReference`, `@TopComponent.Registration`, `@Mode.Registration`, `@NodeFactory.Registration`, `@Renderer`, `@Registration` into a generated `WbRegistrations` class per jar (type-safe factories, no reflection). `@ServiceProvider` and `@Messages` are NetBeans' own.
 
 Detailed design: `design/module-system-and-lookup.md`.
 
@@ -71,7 +64,7 @@ Detailed design: `design/module-system-and-lookup.md`.
 
 `Lookup` is the universal service and selection mechanism — the NetBeans `org.openide.util.Lookup` API, unchanged: `Lookup.getDefault()`, `Lookups.*`, `AbstractLookup`/`InstanceContent`, `ProxyLookup`, `Lookup.Result` listeners.
 
-- `Lookup.getDefault()` (installed by `webbeans-core` through NetBeans' pluggable default) = every module's `@ServiceProvider`s + platform singletons; immutable after startup.
+- `Lookup.getDefault()` (installed by `webbeans-core` through NetBeans' pluggable default) = every jar's `@ServiceProvider`s + platform singletons + the registry's `Services` folder; immutable after startup.
 - `UISession.getLookup()` = per-user contents (`Principal`, `Locale`, `UserFiles`, session services) over the default lookup.
 - `ProxyLookup` composes session, UI, window and node lookups into the "global selection context" (`Utilities.actionsGlobalContext()` analogue): `session → active UI → active TopComponent → selected Nodes`.
 
@@ -94,13 +87,13 @@ Detailed design: `design/sessions-and-delta-protocol.md`.
     layouts/<name>.json    # named layouts (optional, "Window > Save layout as…")
     config/registry.json   # user's menu/toolbar customisations (hide / reorder)
     preferences/<node>.properties   # java.util.prefs-style tree, one file per node
-    <module-id>/…          # module-private per-user files via UserFiles.dir(moduleId)
+    <package-id>/…         # per-user files of one piece of code via UserFiles.dir(id)
   system/
     users.properties       # PropertiesAuthProvider accounts
     preferences/…          # system-level preferences (admin-managed)
 ```
 
-- `UserFiles` API gives modules a per-user directory; writes are atomic (write temp + rename) and debounced.
+- `UserFiles` API gives application code a per-user directory; writes are atomic (write temp + rename) and debounced.
 - `Preferences` implementation (`WbPreferences`) backs `java.util.prefs.Preferences` on these files; `PreferencesFactory` set via system property so standard `Preferences.userNodeForPackage(...)` works unchanged.
 - No database dependency in core. A later `PersistenceProvider` SPI can redirect the same paths to a store.
 
@@ -108,7 +101,7 @@ Detailed design: `design/sessions-and-delta-protocol.md`.
 
 - `org-openide-util` provides `NbBundle.getMessage(...)`, `@Messages` → generated `Bundle.java` + merged `Bundle.properties`, and `Bundle_<branding>_<locale>.properties` branding.
 - Locale per session: `UISession.getLocale()` (user preference → `Accept-Language` → server default) is exposed to `NbBundle` through a thread-local set by the session executor for the duration of each task.
-- Registry attributes written as `#KEY` resolve against the registering module's bundle with the session locale, so display names of actions, modes and components are localised per session.
+- Registry attributes written as `#KEY` resolve against the registering jar's bundle with the session locale, so display names of actions, modes and components are localised per session.
 - Localisation happens entirely on the server: renderers receive already-localised strings, so client JS never needs resource bundles. Number/date formats are compiled server-side into locale-specific specs for the few places the client formats (chart tooltips, number/date fields).
 - Language switch at runtime: the session invalidates its registry views and re-sends display-name deltas; application-computed text is refreshed via a `LocaleChangeEvent` on the session event bus.
 
@@ -251,20 +244,20 @@ Detailed design: `design/scene3d.md`.
 ## 17. Build and packaging
 
 - Maven multi-module: `webbeans-core`, `webbeans-ui`, `webbeans-processor`, `webbeans-api-*`, `webbeans-modules-*`, `webbeans-launcher`, `webbeans-test`, `webbeans-maven-plugin`, `webbeans-app-archetype`.
-- `webbeans-launcher` runs the platform on embedded Jetty 9.4, scans the `--modules` directory, the class path and the application jar (`WEBBEANS-INF/modules/`) for module jars at start, and exposes `--port`, `--host`, `--context`, `--title`, `--dev`, `--datadir`, `--branding`, `--locale`, `--session-timeout`, `--secure-cookies`, `--trusted-proxy`, `--no-websocket`, `--http-threads`; the application jar is built with `maven-shade-plugin` (or `tools/fatjar.py` offline).
+- `webbeans-launcher` runs the platform on embedded Jetty 9.4 over the class path it was started with, and exposes `--port`, `--host`, `--context`, `--title`, `--dev`, `--datadir`, `--branding`, `--locale`, `--session-timeout`, `--secure-cookies`, `--trusted-proxy`, `--no-websocket`, `--http-threads`; the application jar is built with `maven-shade-plugin` (or `tools/fatjar.py` offline).
 - Application projects use `webbeans-maven-plugin` (`wb:run`, `wb:package`) — the NetBeans "suite" equivalent.
 - Dependencies kept minimal (as built): Jetty 9.4 with its WebSocket modules and the Servlet 3.1 API (`webbeans-server` only), NetBeans `org-openide-util-lookup` + `org-openide-util` (RELEASE126), vendored three.js (Scene3D module only). JSON is WebBeans' own small codec; logging is `java.util.logging` (Jetty routed into it); the bundle is concatenated, not minified.
 
 ## 18. Roadmap
 
-1. **Core**: module system, registry, NetBeans Lookup/i18n integration, annotation processor, per-user files. — *implemented* (`impl/step1-core-notes.md`)
+1. **Core**: registry, NetBeans Lookup/i18n integration, annotation processor, per-user files (originally with a module system, removed in step 14 — the class path is the application). — *implemented* (`impl/step1-core-notes.md`, `impl/step14-notes.md`)
 2. **Transport + component model**: sessions/UIs, delta protocol, `wb-core.js`, bundler, standard component library, login. — *implemented* (`impl/step2-notes.md`; first on the JDK `HttpServer` with long polling)
 3. **Window system**: TopComponent, Modes, docking renderer, layout persistence. — *implemented* (`impl/step3-notes.md`)
 4. **Explorer**: Nodes, Children, ExplorerManager, TreeView, OutlineView, PropertySheet, context menus, DnD. — *implemented* (`impl/step4-notes.md`)
 5. **Actions/menus/toolbars/shortcuts**, dialogs, notifications, progress, options. — *implemented* (`impl/step5-notes.md`)
 6. **Charts**. — *implemented* (`impl/step6-notes.md`)
 7. **Scene3D**. — *implemented* (`impl/step7-notes.md`)
-8. **Sample application ("Workbench"), tutorial module and developer docs**. — *implemented* (`impl/step8-notes.md`, `docs/`)
+8. **Sample application ("Workbench"), tutorial and developer docs**. — *implemented* (`impl/step8-notes.md`, `docs/`)
 9. **Help system**: `HelpCtx`, `@HelpPage`, Markdown pages, the Help window, F1, dialog Help buttons, standalone help pages. — *implemented* (`impl/step9-notes.md`)
 10. **Jetty 9.4 + WebSocket transport** with long-poll fallback, replacing the JDK HTTP server. — *implemented* (`impl/step10-notes.md`)
 11. **Standard component library completed**: NumberField, Slider, RadioGroup, date pickers, Form; SplitPane, ScrollPane; ListBox, Tree; the virtualised Table with in-memory and lazy models; Upload and DownloadService. — *implemented* (`impl/step11-notes.md`)
@@ -273,6 +266,7 @@ Detailed design: `design/scene3d.md`.
 
 ## 19. Change log
 
+- v0.8 — step 14: the module system is removed; the application is the class path (§3 rewritten: discovery through `META-INF/services`, `Installer` hooks, no isolation or versions); step 13's HTTPS recorded, its run-time module loading withdrawn with the module system.
 - v0.7 — step 12: the tier-2/3 components of `design/standard-components.md` v0.3 (§8 list extended), `EnumLabels`/`Labeled` as the one place enum display is decided, Quick Search (`QuickSearch/Providers`) in the actions module, `Markdown` moved to `org.webbeans.ui.text`; roadmap updated (no map component: needs a vendored tile library).
 - v0.6 — step 11: the standard component library of §8 is complete as specified in `design/standard-components.md` v0.2 (inputs, Form, containers, lists, Table, uploads, downloads); roadmap updated.
 - v0.5 — step 10: embedded Jetty 9.4 replaces the JDK `HttpServer`; WebSocket transport (Jetty native API, not JSR-356) with automatic long-poll fallback; roadmap marks steps 1–10 as implemented and lists what is next; dependency list as built (no Jackson, Closure or SLF4J); step 9 (help system) recorded.

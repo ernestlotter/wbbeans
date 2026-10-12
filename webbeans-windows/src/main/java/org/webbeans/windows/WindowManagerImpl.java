@@ -84,81 +84,12 @@ public final class WindowManagerImpl extends WindowManager {
                 }
             }
         });
-        ui.getSession().subscribe(UISession.RegistryChangedEvent.class, new Consumer<UISession.RegistryChangedEvent>() {
-            @Override
-            public void accept(UISession.RegistryChangedEvent e) {
-                ui.access(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (ready && ui.getState() != UI.State.CLOSED) {
-                            modulesChanged();
-                        }
-                    }
-                });
-            }
-        });
         ui.addCloseListener(new Runnable() {
             @Override
             public void run() {
                 saveNow();
             }
         });
-    }
-
-    /**
-     * Modules came or went: new modes are added, windows whose registration disappeared (their module was
-     * disabled) are closed and forgotten, and the start-up windows of new modules are opened.
-     */
-    void modulesChanged() {
-        org.webbeans.core.registry.Registry registry = org.webbeans.core.registry.Registry.getDefault();
-        for (Entry e : registry.folder(MODES_PATH).getEntries()) {
-            Entry t = e.getTarget();
-            if (t != null && !modes.containsKey(t.getName())) {
-                loadModes();   // re-reads every registered mode; existing ones keep their layout nodes
-                break;
-            }
-        }
-        int closed = 0;
-        for (TopComponent tc : new ArrayList<TopComponent>(components.values())) {
-            String id = tc.getTopComponentId();
-            String regId = id.contains("#") ? id.substring(0, id.indexOf('#')) : id;
-            if (registry.entry(COMPONENTS_PATH + "/" + regId) == null) {
-                if (tc.isOpened()) {
-                    closeInternal(tc, true, false);
-                    closed++;
-                    layout.closedTcModes.remove(id);   // not closed by the user: it comes back when the module does
-                }
-                components.remove(id);
-            }
-        }
-        int opened = 0;
-        for (Entry ref : startupComponents()) {
-            String id = ref.getName();
-            TopComponent existing = components.get(id);
-            if (existing != null && existing.isOpened()) {
-                continue;
-            }
-            if (existing == null && layout.closedTcModes.containsKey(id)) {
-                continue;   // the user closed it earlier in this layout; do not force it back
-            }
-            TopComponent tc = findTopComponent(id);
-            if (tc != null && !tc.isOpened()) {
-                openInternal(tc, ref.getFolderPath().substring(MODES_PATH.length() + 1), false);
-                opened++;
-            }
-        }
-        if (closed > 0 || opened > 0) {
-            if (activated == null || !activated.isOpened()) {
-                TopComponent act = firstCentreComponent();
-                if (act != null) {
-                    requestActive(act);
-                }
-            }
-            pruneEmptyModes();
-            push();
-            markDirty();
-        }
-        LOG.log(Level.FINE, "Modules changed: {0} windows closed, {1} opened", new Object[] {closed, opened});
     }
 
     /** Creates the window manager for the UI and publishes it in the UI lookup. One per UI. */

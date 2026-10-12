@@ -161,10 +161,6 @@ HELP_CP="$OUT/webbeans-nodes.jar:$OUT/webbeans-actions.jar:$OUT/webbeans-windows
 build_module webbeans-help "$HELP_CP" "$APROCS -Awebbeans.module=org.webbeans.help"
 test_module webbeans-help "$OUT/webbeans-help.jar:$OUT/webbeans-test.jar:$HELP_CP" "$APROCS -Awebbeans.module=org.webbeans.help.test"
 
-MODULES_CP="$OUT/webbeans-nodes.jar:$OUT/webbeans-actions.jar:$OUT/webbeans-windows.jar:$OUT/webbeans-ui.jar:$UI_CP"
-build_module webbeans-modules "$MODULES_CP" "$APROCS -Awebbeans.module=org.webbeans.modules"
-test_module webbeans-modules "$OUT/webbeans-modules.jar:$OUT/webbeans-test.jar:$MODULES_CP" "-proc:none"
-
 SERVER_CP="$OUT/webbeans-ui.jar:$UI_CP:$JETTY_CP"
 build_module webbeans-server "$SERVER_CP" "-proc:none"
 test_module  webbeans-server "$OUT/webbeans-server.jar:$SERVER_CP:$JETTY_CLIENT_CP" "-proc:none"
@@ -193,22 +189,21 @@ for m in core files dashboard viewer3d admin; do
   test_module workbench/workbench-$m "$OUT/workbench/workbench-$m.jar:$WBTEST_CP" "-proc:none"
 done
 
-# the Workbench application jar: platform + branding resources + embedded modules (see tools/fatjar.py)
-WBMODS=""
-for m in core files dashboard viewer3d admin; do [ -f "$OUT/workbench/workbench-$m.jar" ] && WBMODS="$WBMODS $OUT/workbench/workbench-$m.jar"; done
+# the Workbench application jar: platform + the Workbench jars + branding resources merged (see tools/fatjar.py)
+WBJARS=""
+for m in core files dashboard viewer3d admin; do [ -f "$OUT/workbench/workbench-$m.jar" ] && WBJARS="$WBJARS $OUT/workbench/workbench-$m.jar"; done
 mkdir -p "$OUT/workbench-dist"
 # shellcheck disable=SC2086
 python3 tools/fatjar.py "$OUT/workbench-dist/workbench.jar" \
-  --lib "$LIB/org-openide-util-lookup.jar" "$LIB/org-openide-util.jar" $(for j in $JETTY_JARS; do echo "$LIB/$j"; done) $(for m in core auth ui windows actions nodes help modules charts scene3d server launcher; do echo "$OUT/webbeans-$m.jar"; done) \
-  --modules $WBMODS --resources workbench/workbench-app/src/main/resources
+  --lib "$LIB/org-openide-util-lookup.jar" "$LIB/org-openide-util.jar" $(for j in $JETTY_JARS; do echo "$LIB/$j"; done) $(for m in core auth ui windows actions nodes help charts scene3d server launcher; do echo "$OUT/webbeans-$m.jar"; done) $WBJARS \
+  --resources workbench/workbench-app/src/main/resources
 cp workbench/workbench-app/workbench.sh "$OUT/workbench-dist/"
 
-# runnable layout: platform jars in dist/lib, modules in dist/modules
-rm -rf "$OUT/dist"; mkdir -p "$OUT/dist/lib" "$OUT/dist/modules"
+# runnable layout: everything (platform, demo and tutorial) in dist/lib — the class path is the application
+rm -rf "$OUT/dist"; mkdir -p "$OUT/dist/lib"
 cp "$LIB/org-openide-util-lookup.jar" "$LIB/org-openide-util.jar" "$OUT/dist/lib/"
 for j in $JETTY_JARS; do cp "$LIB/$j" "$OUT/dist/lib/"; done
-for m in core auth ui windows actions nodes help modules charts scene3d test server launcher; do cp "$OUT/webbeans-$m.jar" "$OUT/dist/lib/"; done
-cp "$OUT/webbeans-demo.jar" "$OUT/webbeans-tutorial.jar" "$OUT/dist/modules/"
+for m in core auth ui windows actions nodes help charts scene3d test server launcher demo tutorial; do cp "$OUT/webbeans-$m.jar" "$OUT/dist/lib/"; done
 
 echo "== OK: $(ls "$OUT"/*.jar | xargs -n1 basename | tr '\n' ' ')"
-echo "run:  $JAVA_BIN -cp '$OUT/dist/lib/*' org.webbeans.launcher.Main --modules $OUT/dist/modules --datadir data --port 8080"
+echo "run:  $JAVA_BIN -cp '$OUT/dist/lib/*' org.webbeans.launcher.Main --datadir data --port 8080"

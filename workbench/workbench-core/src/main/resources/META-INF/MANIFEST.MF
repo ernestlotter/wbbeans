@@ -1,6 +1,0 @@
-Manifest-Version: 1.0
-WebBeans-Module: org.webbeans.workbench.core
-WebBeans-Module-Version: 1.0.0
-WebBeans-Module-Display-Name: #CTL_CoreModule
-WebBeans-Module-Public-Packages: org.webbeans.workbench.core.api
-WebBeans-Module-Install: org.webbeans.workbench.core.WorkbenchInstaller

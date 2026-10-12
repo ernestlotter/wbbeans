@@ -24,9 +24,6 @@ import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
 import org.openide.util.Lookup;
-import org.webbeans.core.modules.ModuleClassLoader;
-import org.webbeans.core.modules.ModuleInfo;
-import org.webbeans.core.modules.ModuleSystem;
 
 /**
  * The path-keyed registration tree assembled from every enabled module's {@link RegistrationProvider}s —
@@ -85,38 +82,12 @@ public final class Registry {
     // ---- building --------------------------------------------------------------------------------------------
 
     /**
-     * Collects the providers of the platform loader and of every enabled module (in dependency order) and
-     * rebuilds the tree. Called by the platform on {@code modulesLoaded}.
+     * Rebuilds from every {@link RegistrationProvider} the class loader can see
+     * ({@code META-INF/services/org.webbeans.core.registry.RegistrationProvider} of every jar on the class path),
+     * in class-path order: a later jar's entry replaces an earlier one's at the same path.
      */
-    public void rebuild(ModuleSystem modules, ClassLoader platform) {
-        List<ModuleInfo> enabled = modules.getEnabledModules();
-        // service files owned by module jars are the modules' contributions, even when the platform loader
-        // can see them too (modules on the class path in development)
-        Set<String> moduleOwned = new HashSet<String>();
-        for (ModuleInfo m : enabled) {
-            if (m.getClassLoader() instanceof ModuleClassLoader) {
-                try {
-                    for (URL u : Collections.list(((ModuleClassLoader) m.getClassLoader()).findResources(SERVICE))) {
-                        moduleOwned.add(u.toExternalForm());
-                    }
-                } catch (IOException e) {
-                    LOG.log(Level.WARNING, "Cannot enumerate registration providers of " + m, e);
-                }
-            }
-        }
-        List<RegistrationBuilder> contributions = new ArrayList<RegistrationBuilder>();
-        contributions.addAll(collect(null, platform, null, moduleOwned));
-        for (ModuleInfo m : enabled) {
-            ClassLoader loader = m.getClassLoader();
-            contributions.addAll(collect(m, loader, loader instanceof ModuleClassLoader ? (ModuleClassLoader) loader : null,
-                    Collections.<String>emptySet()));
-        }
-        rebuild(contributions);
-    }
-
-    /** Rebuilds from the providers visible to one class loader, without a module system (tests, embedding). */
     public void rebuild(ClassLoader loader) {
-        rebuild(collect(null, loader, null, Collections.<String>emptySet()));
+        rebuild(collect(loader));
     }
 
     /** Replaces the tree with the merge of the given contributions, in order (later wins on conflicts). */
@@ -129,16 +100,16 @@ public final class Registry {
                 if (eb.folder) {
                     FolderData fd = new FolderData(eb.attrs, eb.bundle, b.getLoader(), eb.position);
                     if (folders.put(eb.path, fd) != null) {
-                        LOG.log(Level.FINE, "Folder {0} attributes redefined by {1}", new Object[] {eb.path, b.getModule()});
+                        LOG.log(Level.FINE, "Folder {0} attributes redefined by {1}", new Object[] {eb.path, describe(b.getOrigin())});
                     }
                     continue;
                 }
                 EntryImpl e = new EntryImpl(this, eb.path, eb.kind, eb.target, eb.factory, eb.instanceOf, eb.attrs, eb.bundle,
-                        eb.position, eb.roles, b.getModule(), b.getLoader());
+                        eb.position, eb.roles, b.getOrigin(), b.getLoader());
                 EntryImpl previous = entries.put(eb.path, e);
                 if (previous != null) {
                     LOG.log(Level.WARNING, "Registry entry {0} from {1} replaces the one from {2}",
-                            new Object[] {eb.path, describe(b.getModule()), describe(previous.module)});
+                            new Object[] {eb.path, describe(b.getOrigin()), describe(previous.origin)});
                 }
             }
             hidden.addAll(b.getHidden());
@@ -150,25 +121,22 @@ public final class Registry {
         }
     }
 
-    private static String describe(ModuleInfo m) {
-        return m == null ? "the platform" : m.getCodeName();
+    private static String describe(String origin) {
+        return origin == null ? "programmatic registrations" : origin;
     }
 
     /**
-     * Instantiates the {@link RegistrationProvider}s listed in the loader's <em>own</em>
-     * {@code META-INF/services/org.webbeans.core.registry.RegistrationProvider} (not those of its dependencies)
-     * and runs them.
+     * Instantiates every {@link RegistrationProvider} listed in the
+     * {@code META-INF/services/org.webbeans.core.registry.RegistrationProvider} files the loader can see and runs
+     * them, in class-path order; the provider's class name is the origin named in conflict warnings.
      */
-    static List<RegistrationBuilder> collect(ModuleInfo module, ClassLoader loader, ModuleClassLoader own, Set<String> excludeUrls) {
+    static List<RegistrationBuilder> collect(ClassLoader loader) {
         List<RegistrationBuilder> result = new ArrayList<RegistrationBuilder>();
         try {
-            Enumeration<URL> urls = own != null ? own.findResources(SERVICE) : loader.getResources(SERVICE);
+            Enumeration<URL> urls = loader.getResources(SERVICE);
             Set<String> seen = new LinkedHashSet<String>();
             while (urls.hasMoreElements()) {
                 URL url = urls.nextElement();
-                if (excludeUrls.contains(url.toExternalForm())) {
-                    continue;
-                }
                 for (String className : readServiceFile(url)) {
                     if (!seen.add(className)) {
                         continue;
@@ -176,18 +144,18 @@ public final class Registry {
                     try {
                         Class<?> c = Class.forName(className, true, loader);
                         RegistrationProvider p = (RegistrationProvider) c.getDeclaredConstructor().newInstance();
-                        RegistrationBuilder b = new RegistrationBuilder(module, loader);
+                        RegistrationBuilder b = new RegistrationBuilder(className, loader);
                         p.register(b);
                         result.add(b);
                     } catch (Exception e) {
-                        LOG.log(Level.SEVERE, "Cannot run registration provider " + className + " of " + describe(module), e);
+                        LOG.log(Level.SEVERE, "Cannot run registration provider " + className, e);
                     } catch (LinkageError e) {
-                        LOG.log(Level.SEVERE, "Cannot load registration provider " + className + " of " + describe(module), e);
+                        LOG.log(Level.SEVERE, "Cannot load registration provider " + className, e);
                     }
                 }
             }
         } catch (IOException e) {
-            LOG.log(Level.SEVERE, "Cannot enumerate registration providers of " + describe(module), e);
+            LOG.log(Level.SEVERE, "Cannot enumerate registration providers", e);
         }
         return result;
     }

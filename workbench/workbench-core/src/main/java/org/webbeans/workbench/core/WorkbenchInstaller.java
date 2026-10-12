@@ -7,15 +7,17 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.openide.util.Lookup;
+import org.openide.util.lookup.ServiceProvider;
 import org.webbeans.auth.providers.PropertiesAuthenticationProvider;
+import org.webbeans.core.Installer;
 import org.webbeans.core.files.DataDir;
-import org.webbeans.core.modules.ModuleInstall;
 
 /**
- * Module lifecycle: on the first start creates the two demo accounts ({@code alice}: user + admin,
+ * Start-up hook: on the first start creates the two demo accounts ({@code alice}: user + admin,
  * {@code bob}: user, both with password {@code secret}) so the launcher does not need to generate one.
  */
-public final class WorkbenchInstaller extends ModuleInstall {
+@ServiceProvider(service = Installer.class)
+public final class WorkbenchInstaller extends Installer {
 
     private static final Logger LOG = Logger.getLogger(WorkbenchInstaller.class.getName());
 

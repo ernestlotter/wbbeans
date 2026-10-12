@@ -1,18 +1,20 @@
 # Hello — the smallest WebBeans application
 
-One module, one action: *Tools ▸ Say Hello* opens a dialog. Three files matter:
+One jar, one action: *Tools ▸ Say Hello* opens a dialog. Two files matter:
 
 - `pom.xml` — depends on `webbeans-actions` (the API used) and, at runtime, `webbeans-launcher` (which brings the
   rest of the platform and Jetty); puts the WebBeans annotation processors on the compiler path; copies
-  `Bundle.properties` from next to the sources; writes the module manifest into the jar.
-- `src/main/resources/META-INF/MANIFEST.MF` — makes the jar a WebBeans module (`WebBeans-Module: com.example.hello`).
+  `Bundle.properties` from next to the sources.
 - `src/main/java/com/example/hello/HelloAction.java` — the action, registered into the menu with annotations.
+
+There is nothing else to declare: whatever is on the class path is the application, and the processors write
+the jar's contributions into `META-INF/services`.
 
 Build the platform once (`mvn install` in the repository root, so the `org.webbeans` artifacts are in your local
 repository), then:
 
 ```
-mvn package exec:java            # starts http://localhost:8080/ with the module from target/classes
+mvn package exec:java            # starts http://localhost:8080/ with target/classes on the class path
 ```
 
 or, outside Maven, with the platform jars that `package` copied into `target/lib`:

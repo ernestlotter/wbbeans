@@ -1,5 +1,0 @@
-Manifest-Version: 1.0
-WebBeans-Module: org.webbeans.tutorial
-WebBeans-Module-Version: 1.0.0
-WebBeans-Module-Display-Name: Tutorial
-WebBeans-Module-Public-Packages: -

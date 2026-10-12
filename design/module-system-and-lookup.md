@@ -1,94 +1,41 @@
-# WebBeans — Module System, Registry and Lookup (detailed design v0.3)
+# WebBeans — Class Path, Registry and Lookup (detailed design v0.4)
 
-Roadmap step 1. Everything here is JDK 8. Packages: `org.webbeans.core.modules`, `org.webbeans.core.registry`, `org.webbeans.core.lookup`, `org.webbeans.core.i18n`, `org.webbeans.core.files`.
+Roadmap step 1, revised in step 14. Everything here is JDK 8. Packages: `org.webbeans.core` (`Platform`, `Installer`), `org.webbeans.core.registry`, `org.webbeans.core.lookup`, `org.webbeans.core.i18n`, `org.webbeans.core.files`.
+
+**v0.4 changes** (step 14): the module system is gone — no descriptors, resolver, module class loaders, enable/disable or run-time installation; the application is the class path and §1–3 now describe that. `ModuleInstall` became `Installer`, found through `META-INF/services`. `Entry.getModule()` became `Entry.getClassLoader()`.
 
 **v0.3 changes** (implementation feedback, see `impl/step1-core-notes.md`): `@Messages` is WebBeans' own annotation with session-locale `Bundle` classes (§7); `RegistryLookup.forPath` replaces routing `Lookups.forPath` through the registry (§5); builder API names (`supplier`, `separatorAt`), later-wins merge, properties-file overlay (§4); processor extension SPI (§6).
 **v0.2 changes**: Lookup and i18n are taken from the NetBeans Platform libraries instead of being re-implemented (§5, §7). The XML layer filesystem is dropped; registrations are annotation-only and land in a path-keyed `Registry` (§4).
 
-## 1. Module descriptor
+## 1–3. The application is the class path (v0.4, replaces the module descriptor, manager and class loading of v0.1–0.3)
 
-A module is a jar. All metadata is in `META-INF/MANIFEST.MF`:
+There is no module system. The application is whatever is on the JVM class path: the platform jars plus the
+application's jars (ordinary Maven artifacts, or one merged jar). Every jar takes part through its
+`META-INF/services` files, which the annotation processor and NetBeans' `@ServiceProvider` processor write at
+compile time:
 
-| Attribute | Required | Meaning |
+| Service file | Written by | Read by |
 |---|---|---|
-| `WebBeans-Module` | yes | Code name base, Java-package style, e.g. `org.example.accounts` |
-| `WebBeans-Module-Version` | yes | Specification version, dotted integers `1.2.0` |
-| `WebBeans-Module-Dependencies` | no | Comma-separated `codename [> ver | = ver]` |
-| `WebBeans-Module-Public-Packages` | no | Comma-separated packages; `org.example.api.*` for subpackages; `-` for none (default: none) |
-| `WebBeans-Module-Install` | no | FQCN of `ModuleInstall` subclass |
-| `WebBeans-Module-Display-Name` | no | Human name; `#KEY` refers to the module's `Bundle.properties` |
-| `WebBeans-Module-Autoload` | no | `true`: enabled only if another module depends on it |
-| `WebBeans-Module-Eager` | no | `true`: enabled as soon as all dependencies are satisfiable |
-| `WebBeans-Module-Requires` / `-Provides` | no | Capability tokens |
-| `WebBeans-Module-Class-Path` | no | Wrapped library jars inside the module (`lib/foo.jar`, space separated) |
+| `org.webbeans.core.registry.RegistrationProvider` | `webbeans-processor` (one generated `<name>.generated.WbRegistrations` per jar, from the annotations) | `Registry.rebuild(classLoader)` — all providers, in class-path order |
+| `<service interface>` | `@ServiceProvider` | `Lookup.getDefault()` (`Lookups.metaInfServices(classLoader)`) |
+| `org.webbeans.core.Installer` | `@ServiceProvider(service = Installer.class)` | `Platform.start` (`restored()` in Lookup order) and `shutdown` (`closing()`/`close()` in reverse) |
 
-Version matching: `>` means "at least" (same major, `compareTo >= 0`); `=` means exact. A major-version bump is incompatible, as in NetBeans.
+What this gives up, deliberately: isolation (every class sees every other class), declared dependencies and
+versions (Maven's job), enable/disable and installation at run time (replace jars and restart), public-package
+enforcement. What it keeps: everything above the class loader — the registry with ordering, masking, roles,
+locale and the per-user overlay; the Lookup; the annotations and the processor; the lifecycle hooks.
 
 ```java
-public final class ModuleInfo {                          // ModuleInfo.fromManifest(Manifest, File)
-    public String getCodeName();
-    public SpecificationVersion getVersion();           // WebBeans' own (NetBeans' is in org-openide-modules)
-    public List<Dependency> getDependencies();          // MODULE and REQUIRES entries
-    public Set<String> getPublicPackages();  public boolean isPublicPackage(String pkg);
-    public boolean isEnabled();  public ClassLoader getClassLoader();  public Problem getProblem();
-    public Map<String, String> getAttributes();  public File getLocation();
-}
-public final class Dependency {
-    public enum Comparison { AT_LEAST, EXACT, ANY }
-    public enum Type { MODULE, REQUIRES }
-    public String getName(); public Comparison getComparison(); public SpecificationVersion getVersion();
-    public boolean isSatisfiedBy(SpecificationVersion actual);
+public class Installer {
+    public void restored() {}                 // registry and Lookup complete: seed data, start jobs
+    public boolean closing() { return true; } // may veto shutdown
+    public void close() {}                    // stop what restored() started
 }
 ```
 
-## 2. Module manager and lifecycle
-
-```java
-public abstract class ModuleSystem {
-    public static ModuleSystem getDefault();            // Lookup.getDefault().lookup(ModuleSystem.class)
-    public abstract Collection<ModuleInfo> getModules();
-    public abstract List<ModuleInfo> getEnabledModules();   // dependency order
-    public abstract ModuleInfo find(String codeName);
-    public abstract void enable(Collection<ModuleInfo> modules);   // batch + its transitive dependencies
-    public abstract void disable(Collection<ModuleInfo> modules);  // IllegalArgumentException if depended upon
-    public abstract SystemClassLoader getSystemClassLoader();
-    public abstract boolean closing();  public abstract void close();
-    public abstract void addModuleListener(ModuleListener l);
-}
-```
-
-**Discovery** (`DefaultModuleSystem.discover(dir)`, `discoverClasspath()`): jars on the platform class path whose manifest has `WebBeans-Module` (development convenience; visibility rules are not enforced for them because the platform loader already sees them) and every `*.jar` in `--modules` directories (default `modules/`). Duplicate code names: higher version wins, the other is reported as `DUPLICATE`.
-
-**Resolution** (`Resolver`, pure function → `Resolution { enabled (ordered), problems, notWanted }`): duplicates; Tarjan SCC cycle detection (`CYCLE`); the largest set closed under `MODULE` dependencies and `REQUIRES` tokens (fixed point; `MISSING_DEPENDENCY`, `VERSION_MISMATCH`, `MISSING_REQUIRES`, `DEPENDENCY_DISABLED`); autoload modules only if an enabled module depends on them (otherwise `notWanted`, no problem), eager modules whenever satisfiable; Kahn topological sort with ties by code name. Problems are reported via `ModuleListener.moduleDisabled(info, Problem)` and `ModuleInfo.getProblem()` — never thrown.
-
-**Lifecycle**, in topological order:
-
-```java
-public class ModuleInstall {
-    public void validate() throws IllegalStateException {}  // veto enable before classes are used → INSTALL_FAILED
-    public void restored() {}                                // after the whole batch is loaded and the registry rebuilt
-    public boolean closing() { return true; }                // may veto shutdown
-    public void close() {}
-}
-```
-
-`enable(batch)`: resolve → per module: create class loader, instantiate `ModuleInstall`, `validate()` → `ModuleListener.modulesLoaded(batch)` (the platform rebuilds the `Registry` and re-targets `Lookup.getDefault()` here) → `restored()` each → `modulesEnabled`. `disable` is the reverse (`closing()`, `close()`, loader closed) and only for modules nothing enabled depends on. On top of that, `Platform.installModule/uninstallModule/enableModule/disableModule` (as built, step 13) add and remove modules at run time: the install directory `<datadir>/modules`, replacement in place with dependents re-enabled, a `ModuleWatcher` on that directory, and a `UISession.RegistryChangedEvent` that the server publishes to every session so menus, toolbars, shortcuts and windows follow (the `webbeans-modules` window drives it for administrators).
-
-## 3. Class loading
-
-```
-                 PlatformClassLoader   (webbeans-core, webbeans-ui, NetBeans util/util-lookup, jetty, jackson …)
-                        │
-      ┌─────────────────┼──────────────────┐
- ModuleClassLoader   ModuleClassLoader   ModuleClassLoader   (one per enabled module)
-   org.a (api)   ◄──── org.b depends on org.a
-```
-
-`ModuleClassLoader extends URLClassLoader` (parallel capable):
-
-- `loadClass(name)`: (1) already loaded, (2) the platform (parent) — platform-first for everything, so modules cannot shadow platform classes, (3) own jar + wrapped libraries (extracted to `<datadir>/cache/modules/<module>-<version>/`), (4) each declared dependency's loader **restricted to that module's public packages** (re-export through a dependency's own dependencies is allowed when the package is public there); otherwise `ClassNotFoundException` whose message names the fix ("the class is in module X — add a dependency on it" / "module X does not export package Y").
-- `getResource(s)`: same order; `META-INF/` resources of dependencies are **never** filtered so `ServiceLoader` and NetBeans' `MetaInfServicesLookup` work across modules; other resources follow the public-package rule.
-- `SystemClassLoader` (platform, then every enabled module that owns the class) is published in `Lookup.getDefault()` as `ClassLoader.class` and is what `Lookups.metaInfServices` runs over, so `Lookup.getDefault()` sees every module's `@ServiceProvider`s. The same `Class` object results whether a class is loaded through the system loader or through a dependent module.
+Conflicts: two jars registering the same registry path — the later jar on the class path wins and a warning
+names both providers; `@Hide` masks entries on purpose. The `-Awebbeans.module=<name>` processor option only
+chooses the package of the generated registrations class, so that two jars never generate the same class.
 
 ## 4. Registry (replaces `layer.xml`)
 
@@ -154,7 +101,7 @@ public final class WbRegistrations implements RegistrationProvider {
 ```
 
 - Factories: `supplier(Supplier)`, `factory(Function<Entry,?>)` (static methods taking the `Entry`), `value(Object)`. `instanceOf` lets `instances(type)` filter without instantiating.
-- `RegistrationBuilder` is public: hand-written providers and `ModuleInstall` code may register programmatically; `folder(path)` sets folder attributes/position.
+- `RegistrationBuilder` is public: hand-written providers and `Installer` code may register programmatically; `folder(path)` sets folder attributes/position.
 - Merge: providers are applied platform first, then modules in dependency order; an equal path from a later module replaces the earlier one with a warning (a dependent overriding its dependency); `hide` masks regardless of order. Position ties are sorted by name.
 
 ### 4.4 Sessions, roles, locale, user overlay
@@ -217,21 +164,19 @@ All WebBeans annotations are `@Retention(SOURCE)`. `@ServiceProvider` is NetBean
 - `LocaleContext` — a thread-local locale (`get()` falls back to `Locale.getDefault()`); the session executor (step 2) runs every task inside `LocaleContext.run(session.getLocale(), …)`.
 - `Bundles.getMessage(Class, key, args…)` — `NbBundle.getBundle` for `LocaleContext.get()` plus `MessageFormat`; `Bundles.resolve(loader, bundle, "#KEY", locale)` for registry attributes.
 - `@org.webbeans.core.i18n.Messages({"CTL_Save=Save", "MSG_N={0} items"})` — same syntax as NetBeans'; the processor generates the package-private `Bundle` class (`Bundle.CTL_Save()`, `Bundle.MSG_N(Object)`) calling `Bundles.getMessage`, and merges the keys with the package's source `Bundle.properties` into the class output (reproducibly, no timestamps). Translations go into `Bundle_<locale>.properties` as usual. The only visible difference from NetBeans is the import.
-- Registry `#KEY` attributes and `WebBeans-Module-Display-Name` resolve through `Bundles.resolve` with the context locale at view time, so display names are localised per session; a missing key is logged and shown as `#KEY`.
+- Registry `#KEY` attributes resolve through `Bundles.resolve` with the context locale at view time, so display names are localised per session; a missing key is logged and shown as `#KEY`.
 
 ## 8. Startup sequence (`Platform.start(Config)`)
 
 1. `DataDir` (`users/`, `system/`, `cache/`) from `--datadir`.
-2. `DefaultModuleSystem` with the platform loader, platform tokens (`org.webbeans.ui` + configured) and `cache/modules` for wrapped jars; `discoverClasspath()` (optional) and `discover(dir)` for each `--modules` directory.
-3. `enableAll()` → class loaders, `validate()`; on `modulesLoaded`: `Registry.rebuild` and `WbDefaultLookup.setContent(…)` (§5); `restored()` each.
+2. `Registry.rebuild(classLoader)` over every `RegistrationProvider` on the class path; `WbDefaultLookup.setContent(metaInfServices(classLoader), platform singletons, RegistryLookup("Services"))` (§5).
+3. `Installer.restored()` on every installer found in the Lookup, in order.
 4. The launcher (step 2) then builds the client bundle from `Renderers/` entries and starts Jetty.
 
 ## 9. Testing (implemented)
 
-- Resolver: ordering and ties, missing dependency propagation, version matching (`>`/`=`/major), cycles, duplicates, autoload/eager, requires tokens from platform and modules.
-- Module system with jars built at test time (sources compiled through `javax.tools`): lifecycle order, listener events, public-package enforcement and the explanatory messages, `META-INF/services` visibility, identical `Class` through system and module loaders, `validate()` veto and dependent disabling, wrapped library extraction, disable rules, subset enabling.
 - Registry: ordering, later-wins and `hide` (entry and folder), references/separators, singleton and failed instances, `instanceOf` laziness, roles per context, overlay (hide/reorder, file round-trip), `#KEY` with two locales, change events.
-- Platform: default Lookup publishes platform singletons, module services (both routes), `RegistryLookup.forPath`, role views, data dir layout, shutdown restores the plain Lookup.
+- Platform: jars built at test time (sources compiled through `javax.tools`, `TestJars`) in a `URLClassLoader`: default Lookup publishes platform singletons and the jars' services (both routes), installers run after the Lookup is complete and in reverse at shutdown (veto honoured unless forced), `RegistryLookup.forPath`, role views, data dir layout, shutdown restores the plain Lookup.
 - Processor (`javax.tools` compilation with the processor on the path): class and method factories, references and separators, attribute typing, roles, `@Messages` → `Bundle` class and merged properties honouring the session locale, module package from option or common prefix, `@Hide`, `@Renderer`, error reporting, no output when nothing is annotated.
 
 ## 10. Deviations from NetBeans (deliberate)
@@ -239,5 +184,5 @@ All WebBeans annotations are `@Retention(SOURCE)`. `@ServiceProvider` is NetBean
 - No layer filesystem / `FileObject` API; registration is annotation-only and compiled to Java.
 - Role filtering and locale resolution are first-class in the registry because views are per session.
 - Own `@Messages` for the same reason (session locale); NetBeans' `NbBundle.getMessage` remains usable with the JVM default locale.
-- No module auto-update in v1; modules are files in `modules/` and a restart.
-- `Lookup.getDefault()` is re-targeted only when modules change (step 13); services that come and go within a session belong in the session lookup.
+- No module system at all (v0.4): no manifests, dependencies, isolation, enable/disable or auto-update — the class path is the application and a change is a restart (the run-time module loading built in step 13 was removed with it).
+- `Lookup.getDefault()` is fixed after start-up; services that come and go within a session belong in the session lookup.

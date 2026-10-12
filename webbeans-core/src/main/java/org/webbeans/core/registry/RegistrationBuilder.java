@@ -10,7 +10,6 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import org.webbeans.core.modules.ModuleInfo;
 
 /**
  * Collects registrations from one {@link RegistrationProvider}. Paths are {@code Folder/Sub/name}; a path with
@@ -106,7 +105,7 @@ public final class RegistrationBuilder {
         }
     }
 
-    private final ModuleInfo module;
+    private final String origin;
     private final ClassLoader loader;
     private final List<EntryBuilder> entries = new ArrayList<EntryBuilder>();
     private final List<String> hidden = new ArrayList<String>();
@@ -114,11 +113,11 @@ public final class RegistrationBuilder {
     private int separatorCounter;
 
     /**
-     * @param module the contributing module, or null for platform code
-     * @param loader the loader used to find bundles; the module's loader, or the platform's
+     * @param origin who contributes (a provider class name, say) — named in conflict warnings; may be null
+     * @param loader the loader used to find bundles, icons and classes of the entries
      */
-    public RegistrationBuilder(ModuleInfo module, ClassLoader loader) {
-        this.module = module;
+    public RegistrationBuilder(String origin, ClassLoader loader) {
+        this.origin = origin;
         this.loader = loader;
     }
 
@@ -140,7 +139,7 @@ public final class RegistrationBuilder {
     /** A separator in the given folder; the name is generated. */
     public EntryBuilder separator(String folderPath) {
         String folder = normalize(folderPath);
-        String name = "separator-" + (module != null ? module.getCodeName().replace('.', '-') : "platform") + "-" + (++separatorCounter);
+        String name = "separator-" + (origin != null ? origin.replaceAll("[^A-Za-z0-9]+", "-") : "platform") + "-" + (++separatorCounter);
         return add(new EntryBuilder(folder.isEmpty() ? name : folder + "/" + name, Entry.Kind.SEPARATOR, false, null));
     }
 
@@ -154,7 +153,7 @@ public final class RegistrationBuilder {
         return add(new EntryBuilder(normalize(path), null, true, null));
     }
 
-    /** Masks an entry (or whole folder) contributed by another module. */
+    /** Masks an entry (or whole folder) contributed by other code. */
     public void hide(String path) {
         hidden.add(normalize(path));
     }
@@ -178,8 +177,8 @@ public final class RegistrationBuilder {
         return p;
     }
 
-    ModuleInfo getModule() {
-        return module;
+    String getOrigin() {
+        return origin;
     }
 
     ClassLoader getLoader() {

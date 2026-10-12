@@ -2,18 +2,10 @@ package org.webbeans.core;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
-import java.util.jar.JarFile;
-import java.util.jar.Manifest;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -22,61 +14,36 @@ import org.openide.util.lookup.Lookups;
 import org.webbeans.core.files.DataDir;
 import org.webbeans.core.lookup.RegistryLookup;
 import org.webbeans.core.lookup.WbDefaultLookup;
-import org.webbeans.core.modules.DefaultModuleSystem;
-import org.webbeans.core.modules.ModuleInfo;
-import org.webbeans.core.modules.ModuleListener;
-import org.webbeans.core.modules.ModuleSystem;
 import org.webbeans.core.registry.Registry;
 
 /**
- * Bootstraps the runtime: data directory, module system, registry and the default Lookup. The launcher
- * (step 2) calls {@link #start(Config)} before starting the HTTP server.
+ * Bootstraps the runtime: data directory, registry and the default Lookup. Everything on the class path takes
+ * part — a jar contributes through its {@code META-INF/services} files ({@code RegistrationProvider}s generated
+ * from the annotations, {@code @ServiceProvider} services, {@link Installer}s); there is nothing to declare, no
+ * manifest and no isolation between jars. The launcher calls {@link #start(Config)} before starting the HTTP
+ * server.
  *
- * <p>Startup sequence: discover modules → resolve and load (class loaders, {@code validate()}) →
- * rebuild registry and default Lookup ({@code modulesLoaded}) → {@code restored()} → ready.
- *
- * <p>Modules can also come and go while the application runs: {@link #installModule} copies a jar into the
- * install directory ({@code <datadir>/modules}) and enables it (replacing a running version of the same module,
- * re-enabling its dependents), {@link #uninstallModule} is the reverse, {@link #enableModule}/{@link #disableModule}
- * switch known modules. Every change rebuilds the registry and the default Lookup; the UI layer listens to the
- * registry and updates open sessions. {@link ModuleWatcher} does the same for jars dropped into the directory.
+ * <p>Start-up sequence: build the registry from the class loader → publish the platform singletons and the
+ * class path's services in {@code Lookup.getDefault()} → {@link Installer#restored()} on every installer, in
+ * Lookup order → ready. Shutdown runs {@link Installer#closing()} (any veto stops it unless forced) and
+ * {@link Installer#close()} in reverse order.
  */
 public final class Platform {
 
     private static final Logger LOG = Logger.getLogger(Platform.class.getName());
 
-    /** The capability token every module may require to express "needs the WebBeans UI". */
-    public static final String TOKEN_UI = "org.webbeans.ui";
-
     public static final class Config {
         private Path dataDir;
-        private final List<File> moduleDirs = new ArrayList<File>();
-        private boolean scanClasspath = true;
-        private final Set<String> tokens = new HashSet<String>();
-        private ClassLoader platformLoader = Platform.class.getClassLoader();
+        private ClassLoader classLoader = Platform.class.getClassLoader();
 
         public Config dataDir(Path dir) {
             this.dataDir = dir;
             return this;
         }
 
-        public Config moduleDir(File dir) {
-            moduleDirs.add(dir);
-            return this;
-        }
-
-        public Config scanClasspath(boolean b) {
-            this.scanClasspath = b;
-            return this;
-        }
-
-        public Config provides(String token) {
-            tokens.add(token);
-            return this;
-        }
-
-        public Config platformLoader(ClassLoader loader) {
-            this.platformLoader = loader;
+        /** The loader whose class path is the application (default: the platform's own). */
+        public Config classLoader(ClassLoader loader) {
+            this.classLoader = loader;
             return this;
         }
     }
@@ -84,15 +51,13 @@ public final class Platform {
     private static volatile Platform current;
 
     private final DataDir dataDir;
-    private final java.util.Map<Path, Long> selfWrites = new java.util.concurrent.ConcurrentHashMap<Path, Long>();
-    private final DefaultModuleSystem modules;
     private final Registry registry = new Registry();
-    private final ClassLoader platformLoader;
+    private final ClassLoader classLoader;
+    private final List<Installer> installers = new ArrayList<Installer>();
 
-    private Platform(DataDir dataDir, DefaultModuleSystem modules, ClassLoader platformLoader) {
+    private Platform(DataDir dataDir, ClassLoader classLoader) {
         this.dataDir = dataDir;
-        this.modules = modules;
-        this.platformLoader = platformLoader;
+        this.classLoader = classLoader;
     }
 
     /** The running platform, or null. */
@@ -106,47 +71,30 @@ public final class Platform {
         }
         Path dir = config.dataDir != null ? config.dataDir : new File("data").toPath();
         DataDir dataDir = new DataDir(dir);
-        Set<String> tokens = new HashSet<String>(config.tokens);
-        tokens.add(TOKEN_UI);
-        final DefaultModuleSystem modules = new DefaultModuleSystem(config.platformLoader, tokens,
-                dataDir.getCacheDir().resolve("modules").toFile());
-        final Platform platform = new Platform(dataDir, modules, config.platformLoader);
-
-        modules.addModuleListener(new ModuleListener.Adapter() {
-            @Override
-            public void modulesLoaded(List<ModuleInfo> loaded) {
-                platform.refresh();
-            }
-
-            @Override
-            public void modulesDisabled(List<ModuleInfo> disabled) {
-                platform.refresh();
-            }
-        });
-
-        if (config.scanClasspath) {
-            modules.discoverClasspath();
-        }
-        for (File d : config.moduleDirs) {
-            modules.discover(d);
-        }
-        modules.discover(platform.getInstallDir().toFile());   // modules installed at run time earlier
+        Platform platform = new Platform(dataDir, config.classLoader);
         current = platform;
         try {
-            platform.refresh(); // publish platform singletons even before modules are enabled
-            modules.enableAll();
+            platform.refresh();
+            platform.installers.addAll(Lookup.getDefault().lookupAll(Installer.class));
+            for (Installer i : platform.installers) {
+                try {
+                    i.restored();
+                } catch (RuntimeException e) {
+                    LOG.log(Level.SEVERE, "restored() of " + i.getClass().getName() + " failed", e);
+                }
+            }
         } catch (RuntimeException e) {
             current = null;
             throw e;
         }
-        LOG.log(Level.INFO, "WebBeans platform started with {0} modules enabled, data in {1}",
-                new Object[] {modules.getEnabledModules().size(), dataDir.getRoot()});
+        LOG.log(Level.INFO, "WebBeans platform started: {0} registry entries, {1} installers, data in {2}",
+                new Object[] {platform.registry.paths().size(), platform.installers.size(), dataDir.getRoot()});
         return platform;
     }
 
-    /** Rebuilds the registry from the enabled modules and re-targets {@code Lookup.getDefault()}. */
+    /** Rebuilds the registry from the class path and re-targets {@code Lookup.getDefault()}. */
     public void refresh() {
-        registry.rebuild(modules, platformLoader);
+        registry.rebuild(classLoader);
         WbDefaultLookup def = WbDefaultLookup.getInstance();
         if (def == null) {
             LOG.log(Level.WARNING, "Lookup.getDefault() is not WebBeans' ({0}); platform services are not published",
@@ -154,8 +102,8 @@ public final class Platform {
             return;
         }
         def.setContent(
-                Lookups.metaInfServices(modules.getSystemClassLoader()),
-                Lookups.fixed(this, modules, registry, modules.getSystemClassLoader(), dataDir),
+                Lookups.metaInfServices(classLoader),
+                Lookups.fixed(this, registry, classLoader, dataDir),
                 new RegistryLookup(registry, "Services"));
     }
 
@@ -163,189 +111,44 @@ public final class Platform {
         return dataDir;
     }
 
-    public ModuleSystem getModuleSystem() {
-        return modules;
-    }
-
     public Registry getRegistry() {
         return registry;
     }
 
-    // ---- modules at run time ----------------------------------------------------------------------------------------
-
-    /** Where {@link #installModule} puts jars: {@code <datadir>/modules} (scanned at start like a {@code --modules} dir). */
-    public Path getInstallDir() {
-        Path dir = dataDir.getRoot().resolve("modules");
-        try {
-            Files.createDirectories(dir);
-        } catch (IOException e) {
-            LOG.log(Level.WARNING, "Cannot create " + dir, e);
-        }
-        return dir;
+    /** The loader the application runs from (the class path). */
+    public ClassLoader getClassLoader() {
+        return classLoader;
     }
 
-    /** Reads the module manifest of a jar; throws when it is not a WebBeans module. */
-    public static ModuleInfo describe(Path jar) throws IOException {
-        JarFile jf = new JarFile(jar.toFile());
-        try {
-            Manifest mf = jf.getManifest();
-            ModuleInfo info = mf == null ? null : ModuleInfo.fromManifest(mf, jar.toFile());
-            if (info == null) {
-                throw new IOException(jar.getFileName() + " is not a WebBeans module (no WebBeans-Module manifest attribute)");
-            }
-            return info;
-        } finally {
-            jf.close();
-        }
+    /** The installers found on the class path, in the order their {@code restored()} ran. */
+    public List<Installer> getInstallers() {
+        return Collections.unmodifiableList(installers);
     }
 
-    /**
-     * Installs a module jar: copies it into {@link #getInstallDir()} as {@code <codeName>.jar} and enables it. A
-     * running module with the same code name is disabled first (together with the modules depending on it, which
-     * are re-enabled afterwards), so this also upgrades a module in place. Returns the new module descriptor;
-     * {@link ModuleInfo#getProblem()} tells why it could not be enabled, if so.
-     */
-    public synchronized ModuleInfo installModule(Path jar) throws IOException {
-        ModuleInfo incoming = describe(jar);
-        Path target = getInstallDir().resolve(incoming.getCodeName() + ".jar");
-        boolean inPlace = target.toAbsolutePath().normalize().equals(jar.toAbsolutePath().normalize());
-        List<ModuleInfo> reenable = retire(incoming.getCodeName());
-        if (!inPlace) {
-            Files.copy(jar, target, StandardCopyOption.REPLACE_EXISTING);
-            selfWrites.put(target.toAbsolutePath().normalize(), System.currentTimeMillis());
-        }
-        ModuleInfo installed = adopt(target);
-        List<ModuleInfo> batch = new ArrayList<ModuleInfo>();
-        batch.add(installed);
-        batch.addAll(reenable);
-        modules.enable(batch);
-        LOG.log(Level.INFO, "Installed module {0} from {1}: {2}", new Object[] {installed, jar.getFileName(),
-            installed.isEnabled() ? "enabled" : "not enabled (" + installed.getProblem() + ")"});
-        return installed;
-    }
-
-    /** Installs a module from a stream (an upload), see {@link #installModule(Path)}. */
-    public ModuleInfo installModule(InputStream jar, String fileName) throws IOException {
-        Path tmp = Files.createTempFile("wb-module", ".jar");
-        try {
-            Files.copy(jar, tmp, StandardCopyOption.REPLACE_EXISTING);
-            return installModule(tmp);
-        } finally {
-            Files.deleteIfExists(tmp);
-        }
-    }
-
-    /**
-     * Disables and forgets a module installed through {@link #installModule} and deletes its jar. Modules that
-     * depend on it are disabled as well (they stay known and can be enabled again when a replacement arrives).
-     */
-    public synchronized void uninstallModule(String codeName) throws IOException {
-        ModuleInfo info = modules.find(codeName);
-        if (info == null) {
-            throw new IllegalArgumentException("Unknown module " + codeName);
-        }
-        if (info.getLocation() == null || !info.getLocation().getParentFile().getAbsoluteFile().equals(getInstallDir().toFile().getAbsoluteFile())) {
-            throw new IllegalArgumentException(codeName + " was not installed at run time (" + info.getLocation() + "); remove it from its module directory");
-        }
-        retire(codeName);
-        for (ModuleInfo m : modules.findByLocation(info.getLocation())) {
-            modules.remove(m);
-        }
-        Files.deleteIfExists(info.getLocation().toPath());
-        refresh();
-        LOG.log(Level.INFO, "Uninstalled module {0}", codeName);
-    }
-
-    /** Enables a known module (and what it needs); returns it, {@link ModuleInfo#getProblem()} set when it failed. */
-    public synchronized ModuleInfo enableModule(String codeName) {
-        ModuleInfo info = modules.find(codeName);
-        if (info == null) {
-            throw new IllegalArgumentException("Unknown module " + codeName);
-        }
-        if (!info.isEnabled()) {
-            modules.enable(Collections.singletonList(info));
-        }
-        return info;
-    }
-
-    /** Disables a module together with the enabled modules that depend on it; returns what was disabled. */
-    public synchronized List<ModuleInfo> disableModule(String codeName) {
-        ModuleInfo info = modules.find(codeName);
-        if (info == null) {
-            throw new IllegalArgumentException("Unknown module " + codeName);
-        }
-        if (!info.isEnabled()) {
-            return Collections.emptyList();
-        }
-        List<ModuleInfo> batch = new ArrayList<ModuleInfo>();
-        batch.add(info);
-        batch.addAll(modules.dependents(Collections.singletonList(info)));
-        modules.disable(batch);
-        return batch;
-    }
-
-    /**
-     * Disables every enabled module with the code name plus its dependents and forgets the versions of it found
-     * in the install directory; returns the dependents (to enable again after a replacement).
-     */
-    private List<ModuleInfo> retire(String codeName) {
-        List<ModuleInfo> dependents = new ArrayList<ModuleInfo>();
-        ModuleInfo running = modules.find(codeName);
-        if (running != null && running.isEnabled()) {
-            dependents = modules.dependents(Collections.singletonList(running));
-            List<ModuleInfo> batch = new ArrayList<ModuleInfo>();
-            batch.add(running);
-            batch.addAll(dependents);
-            modules.disable(batch);
-        }
-        Path target = getInstallDir().resolve(codeName + ".jar");
-        for (ModuleInfo m : modules.findByLocation(target.toFile())) {
-            modules.remove(m);
-        }
-        return dependents;
-    }
-
-    /** Registers the jar at the given path (already in the install directory) with the module system. */
-    private ModuleInfo adopt(Path jar) throws IOException {
-        ModuleInfo info = describe(jar);
-        modules.add(info);
-        return info;
-    }
-
-    /** For the watcher: whether the platform itself wrote this jar a moment ago (its own copy, not a user's drop). */
-    boolean consumeSelfWrite(Path jar) {
-        Long t = selfWrites.remove(jar.toAbsolutePath().normalize());
-        return t != null && System.currentTimeMillis() - t < 30000;
-    }
-
-    /** The module whose class loader loaded the class, or null for platform classes. */
-    public ModuleInfo moduleOf(Class<?> type) {
-        ClassLoader l = type.getClassLoader();
-        while (l != null) {
-            if (l instanceof org.webbeans.core.modules.ModuleClassLoader) {
-                return ((org.webbeans.core.modules.ModuleClassLoader) l).getModuleInfo();
-            }
-            l = l.getParent();
-        }
-        return null;
-    }
-
-    /** Runs the module shutdown hooks; returns false if a module vetoed. */
+    /** Runs the shutdown hooks; returns false if an installer vetoed (and {@code force} was false). */
     public synchronized boolean shutdown(boolean force) {
-        if (!modules.closing() && !force) {
-            return false;
+        List<Installer> reverse = new ArrayList<Installer>(installers);
+        Collections.reverse(reverse);
+        if (!force) {
+            for (Installer i : reverse) {
+                if (!i.closing()) {
+                    LOG.log(Level.INFO, "Shutdown vetoed by {0}", i.getClass().getName());
+                    return false;
+                }
+            }
         }
-        modules.close();
+        for (Installer i : reverse) {
+            try {
+                i.close();
+            } catch (RuntimeException e) {
+                LOG.log(Level.WARNING, "close() of " + i.getClass().getName() + " failed", e);
+            }
+        }
         WbDefaultLookup def = WbDefaultLookup.getInstance();
         if (def != null) {
             def.setContent(Lookups.metaInfServices(Platform.class.getClassLoader()));
         }
         current = null;
         return true;
-    }
-
-    /** For tests: the modules enabled, in order. */
-    public List<ModuleInfo> getEnabledModules() {
-        return Collections.unmodifiableList(modules.getEnabledModules());
     }
 }

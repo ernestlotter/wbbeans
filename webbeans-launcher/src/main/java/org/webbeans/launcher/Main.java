@@ -1,6 +1,5 @@
 package org.webbeans.launcher;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -12,7 +11,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.webbeans.auth.providers.PropertiesAuthenticationProvider;
-import org.webbeans.core.ModuleWatcher;
 import org.webbeans.core.Platform;
 import org.webbeans.server.SelfSignedCertificate;
 import org.webbeans.server.ServerConfig;
@@ -22,16 +20,15 @@ import org.webbeans.server.WbServer;
  * Starts the platform and the HTTP server.
  *
  * <pre>
- * java -cp 'lib/*' org.webbeans.launcher.Main [--port 8080] [--host 0.0.0.0] [--datadir data] [--modules modules]
+ * java -cp 'lib/*' org.webbeans.launcher.Main [--port 8080] [--host 0.0.0.0] [--datadir data]
  *      [--context /app] [--title "My App"] [--locale de] [--session-timeout 30m] [--dev] [--admin-password x]
  *      [--no-websocket] [--http-threads 32] [--max-upload 256m]
  *      [--https-port 8443 [--keystore server.p12 --keystore-password x [--key-password y] [--keystore-type PKCS12]]
  *       [--https-redirect] [--no-http] [--no-hsts]]
  * </pre>
  *
- * Modules at run time: jars dropped into {@code <datadir>/modules} are installed (and removed ones uninstalled)
- * while the application runs, unless {@code --no-watch-modules}; Tools ▸ Modules does the same from the browser
- * for administrators.
+ * The application is whatever is on the class path: every jar's {@code META-INF/services} (registrations,
+ * services, installers) takes part; there is nothing to declare.
  *
  * HTTPS: {@code --https-port} serves TLS from the given key store (PKCS12 or JKS). Without {@code --keystore} a
  * self-signed certificate for {@code localhost} is generated into {@code <datadir>/system/selfsigned.p12} on the
@@ -53,11 +50,9 @@ public final class Main {
     public static void main(String[] args) throws Exception {
         ServerConfig config = new ServerConfig();
         Path dataDir = Paths.get("data");
-        File modulesDir = null;
         String adminPassword = System.getenv("WEBBEANS_ADMIN_PASSWORD");
         boolean noDefaultAdmin = false;
         String branding = null;
-        boolean watchModules = true;
         int httpsPort = -1;
         Path keyStore = null;
         String keyStorePassword = System.getenv("WEBBEANS_KEYSTORE_PASSWORD");
@@ -72,9 +67,6 @@ public final class Main {
                 i++;
             } else if (a.equals("--datadir")) {
                 dataDir = Paths.get(require(a, v));
-                i++;
-            } else if (a.equals("--modules")) {
-                modulesDir = new File(require(a, v));
                 i++;
             } else if (a.equals("--context")) {
                 config.contextPath(require(a, v));
@@ -111,8 +103,6 @@ public final class Main {
             } else if (a.equals("--max-upload")) {
                 config.maxUploadSize(parseSize(require(a, v)));   // 10m, 2g, 512k, or bytes
                 i++;
-            } else if (a.equals("--no-watch-modules")) {
-                watchModules = false;   // do not pick up jars dropped into <datadir>/modules
             } else if (a.equals("--https-port")) {
                 httpsPort = Integer.parseInt(require(a, v));
                 i++;
@@ -135,11 +125,11 @@ public final class Main {
             } else if (a.equals("--no-hsts")) {
                 config.hsts(false);
             } else if (a.equals("--help") || a.equals("-h")) {
-                System.out.println("Options: --port N --host H --datadir DIR --modules DIR --context /path --title T --locale xx"
+                System.out.println("Options: --port N --host H --datadir DIR --context /path --title T --locale xx"
                         + " --session-timeout 30m --admin-password PW --no-default-admin --branding NAME --dev --secure-cookies --trusted-proxy IP"
                         + " --no-websocket --http-threads N --max-upload 256m"
                         + " --https-port N --keystore FILE --keystore-password PW --key-password PW --keystore-type PKCS12|JKS"
-                        + " --https-redirect --no-http --no-hsts --no-watch-modules");
+                        + " --https-redirect --no-http --no-hsts");
                 return;
             } else {
                 throw new IllegalArgumentException("Unknown option " + a);
@@ -170,30 +160,16 @@ public final class Main {
         if (branding != null && !branding.isEmpty()) {
             org.openide.util.NbBundle.setBranding(branding);   // Bundle_<branding>.properties overlays every bundle
         }
-        Platform.Config pc = new Platform.Config().dataDir(dataDir);
-        File embedded = EmbeddedModules.extract(dataDir);
-        if (modulesDir != null) {
-            pc.moduleDir(modulesDir);
-            if (embedded != null) {
-                EmbeddedModules.link(embedded, modulesDir);
-            }
-        } else if (embedded != null) {
-            pc.moduleDir(embedded);
-        }
-        final Platform platform = Platform.start(pc);
+        final Platform platform = Platform.start(new Platform.Config().dataDir(dataDir));
         if (!noDefaultAdmin) {
             ensureAdminAccount(platform, adminPassword);
         }
 
         final WbServer server = new WbServer(config);
         server.start();
-        final ModuleWatcher watcher = watchModules ? new ModuleWatcher(platform) : null;
         Runtime.getRuntime().addShutdownHook(new Thread("wb-shutdown") {
             @Override
             public void run() {
-                if (watcher != null) {
-                    watcher.close();
-                }
                 server.stop();
                 platform.shutdown(true);
             }

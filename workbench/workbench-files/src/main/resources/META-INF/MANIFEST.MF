@@ -1,6 +1,0 @@
-Manifest-Version: 1.0
-WebBeans-Module: org.webbeans.workbench.files
-WebBeans-Module-Version: 1.0.0
-WebBeans-Module-Display-Name: #CTL_FilesModule
-WebBeans-Module-Dependencies: org.webbeans.workbench.core > 1.0
-WebBeans-Module-Public-Packages: -
