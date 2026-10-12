@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The smallest WebBeans application: one module with one menu action, run with the platform launcher. -->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.example</groupId>
+  <artifactId>hello</artifactId>
+  <version>1.0.0</version>
+  <name>Hello (WebBeans example)</name>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.compiler.source>1.8</maven.compiler.source>
+    <maven.compiler.target>1.8</maven.compiler.target>
+    <webbeans.version>0.1.0-SNAPSHOT</webbeans.version>
+    <netbeans.version>RELEASE126</netbeans.version>
+  </properties>
+
+  <dependencies>
+    <!-- the APIs this module uses -->
+    <dependency>
+      <groupId>org.webbeans</groupId>
+      <artifactId>webbeans-actions</artifactId>
+      <version>${webbeans.version}</version>
+    </dependency>
+    <!-- the launcher pulls in the rest of the platform (server, Jetty) for mvn exec:java and the lib/ copy -->
+    <dependency>
+      <groupId>org.webbeans</groupId>
+      <artifactId>webbeans-launcher</artifactId>
+      <version>${webbeans.version}</version>
+      <scope>runtime</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <finalName>hello</finalName>
+    <resources>
+      <!-- Bundle.properties lives next to the sources (NetBeans convention); the processor merges @Messages into it -->
+      <resource>
+        <directory>src/main/java</directory>
+        <excludes><exclude>**/*.java</exclude></excludes>
+      </resource>
+      <resource>
+        <directory>src/main/resources</directory>
+      </resource>
+    </resources>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.11.0</version>
+        <configuration>
+          <!-- the WebBeans processors generate Bundle and the registrations for @ActionRegistration & co. -->
+          <annotationProcessorPaths>
+            <path><groupId>org.webbeans</groupId><artifactId>webbeans-processor</artifactId><version>${webbeans.version}</version></path>
+            <path><groupId>org.webbeans</groupId><artifactId>webbeans-windows-processor</artifactId><version>${webbeans.version}</version></path>
+            <path><groupId>org.webbeans</groupId><artifactId>webbeans-actions-processor</artifactId><version>${webbeans.version}</version></path>
+            <path><groupId>org.netbeans.api</groupId><artifactId>org-openide-util-lookup</artifactId><version>${netbeans.version}</version></path>
+          </annotationProcessorPaths>
+          <compilerArgs><arg>-Awebbeans.module=com.example.hello</arg></compilerArgs>
+        </configuration>
+      </plugin>
+      <plugin>
+        <!-- the module jar carries the WebBeans-Module manifest from src/main/resources -->
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.3.0</version>
+        <configuration>
+          <archive><manifestFile>src/main/resources/META-INF/MANIFEST.MF</manifestFile></archive>
+        </configuration>
+      </plugin>
+      <plugin>
+        <!-- target/lib: the platform jars, so the app can be started outside Maven as well -->
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>3.6.1</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals><goal>copy-dependencies</goal></goals>
+            <configuration>
+              <outputDirectory>${project.build.directory}/lib</outputDirectory>
+              <includeScope>runtime</includeScope>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <!-- mvn compile exec:java — the launcher finds the module on the class path (target/classes) -->
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>3.1.0</version>
+        <configuration>
+          <mainClass>org.webbeans.launcher.Main</mainClass>
+          <arguments>
+            <argument>--datadir</argument><argument>${project.build.directory}/data</argument>
+            <argument>--port</argument><argument>8080</argument>
+            <argument>--title</argument><argument>Hello</argument>
+          </arguments>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>

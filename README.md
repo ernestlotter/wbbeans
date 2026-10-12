@@ -40,6 +40,9 @@ Platform pieces added in step 8: the Options dialog (`OptionsPanelController` + 
 
 ## Building and running
 
+The smallest possible application — one module with one menu action, started with the launcher — is in
+[`examples/hello`](examples/hello/README.md) (three files: a pom, a module manifest, an action class).
+
 Standard build (needs Maven Central access; JDK 8 or newer — on JDK 9+ the `jdk9-plus` profile adds
 `--release 8` so the Java 8 API is enforced too):
 
