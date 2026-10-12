@@ -40,19 +40,28 @@ Platform pieces added in step 8: the Options dialog (`OptionsPanelController` + 
 
 ## Building and running
 
-Standard build (needs Maven Central access):
+Standard build (needs Maven Central access; JDK 8 or newer — on JDK 9+ the `jdk9-plus` profile adds
+`--release 8` so the Java 8 API is enforced too):
 
 ```
 mvn verify
 java -jar webbeans-launcher/target/dist/webbeans-launcher.jar --modules webbeans-demo/target --datadir data
 ```
 
-Offline build used during development (compiles with `javac --release 8` against jars in `../third_party/lib`
+In the NetBeans IDE: *File ▸ Open Project*, choose the repository folder (the `WebBeans Platform` parent) and
+tick *Open Required Projects*; then *Clean and Build* the parent, which builds every module in dependency order
+and runs the tests. The JDK the build runs with is set per project under *Properties ▸ Build ▸ Compile ▸ Java
+Platform* (register the JDK first under *Tools ▸ Java Platforms*). The generated `Bundle` classes and
+`WbRegistrations` come from the annotation processors declared in each module's `pom.xml`, so the editor shows
+them after the first build. To run the demo from the IDE, use the `webbeans-launcher` project's *Run* with the
+arguments above, or the `tools/fatjar.py`/`build.sh` output from a terminal.
+
+Offline build used during development (compiles for Java 8 against jars in `../third_party/lib`
 and runs the JUnit tests): `./build.sh`. On the first run it calls `tools/fetch-third-party.sh`, which downloads
 the jars it needs (NetBeans lookup/util, JUnit, the Servlet API, Jetty and its WebSocket modules) from Maven
 Central into that directory; without network access, run that script elsewhere or copy the jars there.
-The JDK is taken from the `PATH`, or from `JAVA_HOME` / `./build.sh --jdk /path/to/jdk` (any JDK 8+ with
-`--release 8` support; `LIB` and `OUT` override the jar and output directories). It leaves a runnable layout
+The JDK is taken from the `PATH`, or from `JAVA_HOME` / `./build.sh --jdk /path/to/jdk` (JDK 8 compiles with
+`-source/-target 8`, JDK 9+ with `--release 8`; `LIB` and `OUT` override the jar and output directories). It leaves a runnable layout
 in `build/dist`:
 
 ```

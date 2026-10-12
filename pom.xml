@@ -170,8 +170,6 @@
           <configuration>
             <source>1.8</source>
             <target>1.8</target>
-            <!-- On JDK 9+ this enforces the JDK 8 API surface as well, not just the bytecode level -->
-            <release>8</release>
             <showWarnings>true</showWarnings>
           </configuration>
         </plugin>
@@ -194,4 +192,18 @@
       </plugins>
     </pluginManagement>
   </build>
+
+  <profiles>
+    <!-- Building on JDK 9+: the release flag (8) also checks the code against the Java 8 API, not only the bytecode
+         level. JDK 8's javac has no such flag, so the setting is tied to the JDK running the build. -->
+    <profile>
+      <id>jdk9-plus</id>
+      <activation>
+        <jdk>[9,)</jdk>
+      </activation>
+      <properties>
+        <maven.compiler.release>8</maven.compiler.release>
+      </properties>
+    </profile>
+  </profiles>
 </project>
