@@ -103,12 +103,12 @@ public final class ProgressStatusCell extends Component implements ProgressRegis
 
     private void push() {
         List<ProgressHandle> running = registry.getRunning();
-        set(COUNT, running.size());
         if (running.isEmpty()) {
             set(TEXT, null);
             set(VALUE, -1.0);
             set(CANCELLABLE, Boolean.FALSE);
             set(TASKS, null);
+            set(COUNT, 0);
             return;
         }
         ProgressHandle h = running.get(running.size() - 1);
@@ -129,5 +129,6 @@ public final class ProgressStatusCell extends Component implements ProgressRegis
             tasks.add(m);
         }
         set(TASKS, tasks);
+        set(COUNT, running.size());   // last: an observer that sees the count sees the matching text and value
     }
 }

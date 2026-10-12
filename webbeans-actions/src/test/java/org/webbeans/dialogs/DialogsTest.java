@@ -381,25 +381,45 @@ public class DialogsTest {
         h.start(10);
         h.progress("sector 3", 3);
         waitFor(cell, ProgressStatusCell.COUNT, 1);
-        assertEquals("Scan: sector 3", cell.get(ProgressStatusCell.TEXT));
-        assertEquals(0.3, cell.get(ProgressStatusCell.VALUE), 0.001);
-        assertTrue(cell.get(ProgressStatusCell.CANCELLABLE));
+        t.run(new Runnable() {
+            @Override
+            public void run() {
+                assertEquals("Scan: sector 3", cell.get(ProgressStatusCell.TEXT));
+                assertEquals(0.3, cell.get(ProgressStatusCell.VALUE), 0.001);
+                assertTrue(cell.get(ProgressStatusCell.CANCELLABLE));
+            }
+        });
         ProgressHandle other = ProgressHandleFactory.createHandle("Other", null, t.session);
         other.start();
         waitFor(cell, ProgressStatusCell.COUNT, 2);
-        assertEquals("newest first", "Other", cell.get(ProgressStatusCell.TEXT));
-        assertEquals(-1.0, cell.get(ProgressStatusCell.VALUE), 0.001);
-        assertFalse(cell.get(ProgressStatusCell.CANCELLABLE));
+        t.run(new Runnable() {
+            @Override
+            public void run() {
+                assertEquals("newest first", "Other", cell.get(ProgressStatusCell.TEXT));
+                assertEquals(-1.0, cell.get(ProgressStatusCell.VALUE), 0.001);
+                assertFalse(cell.get(ProgressStatusCell.CANCELLABLE));
+            }
+        });
         t.fire(cell, "cancel", TestUI.map("index", 0));
         assertEquals(Arrays.asList("yes"), cancelled);
         assertTrue(h.isCancelled());
         other.finish();
         h.finish();
         waitFor(cell, ProgressStatusCell.COUNT, 0);
-        assertNull(cell.get(ProgressStatusCell.TEXT));
+        t.run(new Runnable() {
+            @Override
+            public void run() {
+                assertNull(cell.get(ProgressStatusCell.TEXT));
+            }
+        });
     }
 
-    private static <T> void waitFor(Component c, org.webbeans.ui.Property<T> p, T expected) throws InterruptedException {
+    /**
+     * Polls a property from the test thread until the coalescing timer has pushed it. The cell's other
+     * properties are read on the session executor afterwards ({@code t.run}): the push sets them one after
+     * another, so a read from this thread right after the poll could land between two of the sets.
+     */
+    private <T> void waitFor(final Component c, final org.webbeans.ui.Property<T> p, final T expected) throws InterruptedException {
         long end = System.currentTimeMillis() + 3000;
         while (System.currentTimeMillis() < end) {
             if (expected.equals(c.get(p))) {
@@ -407,6 +427,11 @@ public class DialogsTest {
             }
             Thread.sleep(20);
         }
-        assertEquals(expected, c.get(p));
+        t.run(new Runnable() {
+            @Override
+            public void run() {
+                assertEquals(expected, c.get(p));
+            }
+        });
     }
 }
