@@ -38,8 +38,8 @@ hello/
       HelloTopComponent.java
       SayHelloAction.java
       package-info.java                     package-level registrations (help pages, shared messages)
-      Bundle.properties                     (optional; @Messages generates/merges it — it lives next to the sources)
-      Bundle_de.properties                  translations
+      Bundle.properties                     (optional, hand-written keys; never touched by the processor)
+      Bundle_de.properties                  translations — of hand-written and @Messages keys alike
   src/main/resources/com/acme/hello/hello.svg
   src/main/resources/com/acme/hello/help/hello.md       help pages (§10)
 ```
@@ -192,7 +192,7 @@ The class path is read once at start-up: `Platform.start` builds the registry fr
 
 - Put strings in `@Messages` (`org.webbeans.core.i18n.Messages`) on the class (or on `package-info.java` for shared keys); call the generated `Bundle.KEY(args)`. Keys with `{0}`… placeholders become methods with parameters. A key may appear once per package; give shared keys one home.
 - Any registration attribute starting with `#` is a key in that package's bundle: `displayName = "#CTL_Save"`.
-- Translations: `Bundle_de.properties` next to the class (in `src/main/java`, NetBeans style — the processor merges `@Messages` keys into the base `Bundle.properties` there). Help pages: `page_de.md` next to `page.md`. Branding: start the launcher with `--branding acme` and put `Bundle_acme.properties` (and `Bundle_acme_de.properties`) next to any bundle you want to override — the application jar is the place for overlays of platform bundles (the Workbench renames the Help menu that way).
+- Translations: `Bundle_de.properties` next to the class (in `src/main/java`, NetBeans style). The processor writes the `@Messages` defaults to `Bundle-generated.properties` in the class output and never touches `Bundle.properties`: a hand-written `Bundle.properties` (keys you reference as `#KEY` from registrations, or share with other code) and the generated file are merged at run time, hand-written files first — so `Bundle_de.properties` translates `@Messages` keys too, a package needs no base `Bundle.properties` for its `Bundle_de.properties` to count, and it does not matter whether your build copies resources before javac (Maven), after it (NetBeans Ant projects) or into a separate directory (Gradle). A key that is both hand-written and in `@Messages` is a compile error. Help pages: `page_de.md` next to `page.md`. Branding: start the launcher with `--branding acme` and put `Bundle_acme.properties` (and `Bundle_acme_de.properties`) next to any bundle you want to override — the application jar is the place for overlays of platform bundles (the Workbench renames the Help menu that way).
 - The locale is per session (`UISession.getLocale()`). Generated `Bundle` methods and `Bundles.getMessage(Class, key, args)` use it automatically on the session thread; NetBeans' own `NbBundle.getMessage` is bound to the JVM default locale, so do not use it for user-visible text. Changing the locale (`session.setLocale(Locale.GERMAN)`) relabels the dock, the explorer's menus, the menu bar and the toolbars (rebuilt from the registry) and calls `localeChanged()` on every open window — override it to `setDisplayName(Bundle.CTL_MyWindow())` and refresh your own labels; other components subscribe to `UISession.LocaleChangeEvent` on the session bus. Actions created from registrations resolve their `displayName` on every read, so one shared action instance serves users in different languages.
 - Format numbers and dates with `java.text`/`java.time` and `UISession.current().getLocale()`; property editors already do; the browser never formats anything except chart tooltips and number/date fields (from a server-compiled spec).
 

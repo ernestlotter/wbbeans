@@ -42,6 +42,15 @@ final class Compile {
 
     /** @param sources alternating fully-qualified-name, source-code (or "res:path", content for resources) */
     static Compile run(List<String> options, String... sources) throws IOException {
+        return run(true, true, options, sources);
+    }
+
+    /**
+     * @param sourcePath    pass {@code -sourcepath} (Maven does; NetBeans' Ant projects and Gradle do not)
+     * @param copyResources copy the resources into the class output before compiling (Maven) — otherwise they stay
+     *                      in the source tree only, as in a build that copies them afterwards
+     */
+    static Compile run(boolean sourcePath, boolean copyResources, List<String> options, String... sources) throws IOException {
         Path root = Files.createTempDirectory("wb-proc");
         Path src = root.resolve("src");
         Path out = root.resolve("classes");
@@ -53,7 +62,7 @@ final class Compile {
             String code = sources[i + 1];
             if (name.startsWith("res:")) {
                 // like Maven: resources are both on the source path and copied to the class output
-                for (Path base : new Path[] {src, out}) {
+                for (Path base : copyResources ? new Path[] {src, out} : new Path[] {src}) {
                     Path f = base.resolve(name.substring(4));
                     Files.createDirectories(f.getParent());
                     Files.write(f, code.getBytes(StandardCharsets.ISO_8859_1));
@@ -71,12 +80,14 @@ final class Compile {
         Files.walk(src).filter(p -> p.toString().endsWith(".java")).forEach(p -> files.add(p.toFile()));
         List<String> opts = new ArrayList<String>(Arrays.asList(
                 "-d", out.toString(),
-                "-sourcepath", src.toString(),
                 "-cp", System.getProperty("java.class.path"),
                 "-processorpath", System.getProperty("java.class.path"),
                 "-processor", WbProcessor.class.getName(),
                 "-implicit:class",
                 "-Xlint:-options"));
+        if (sourcePath) {
+            opts.addAll(Arrays.asList("-sourcepath", src.toString()));
+        }
         // Java 8 output from whichever JDK runs the tests: javac 8 has no --release flag
         if (System.getProperty("java.specification.version").startsWith("1.")) {
             opts.addAll(Arrays.asList("-source", "8", "-target", "8"));

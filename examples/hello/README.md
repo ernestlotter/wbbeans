@@ -4,7 +4,8 @@ One jar, one action: *Tools ▸ Say Hello* opens a dialog. Two files matter:
 
 - `pom.xml` — depends on `webbeans-actions` (the API used) and, at runtime, `webbeans-launcher` (which brings the
   rest of the platform and Jetty); puts the WebBeans annotation processors on the compiler path; copies
-  `Bundle.properties` from next to the sources.
+  any hand-written `Bundle*.properties` from next to the sources (the `@Messages` keys land in a generated
+  `Bundle-generated.properties`, so the two never overwrite each other).
 - `src/main/java/com/example/hello/HelloAction.java` — the action, registered into the menu with annotations.
 
 There is nothing else to declare: whatever is on the class path is the application, and the processors write

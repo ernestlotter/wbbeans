@@ -11,9 +11,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.ResourceBundle;
 
 import org.junit.After;
 import org.junit.Test;
+import org.webbeans.core.i18n.Bundles;
 import org.webbeans.core.i18n.LocaleContext;
 import org.webbeans.core.registry.Entry;
 import org.webbeans.core.registry.RegistrationBuilder;
@@ -103,17 +105,24 @@ public class WbProcessorTest {
         assertEquals("Services/org-example-accounts-util-Factories-echo",
                 r.entry("Services/org-example-accounts-util-Factories-echo").getInstance(String.class));
 
-        // messages: Bundle class and merged properties, session locale aware
+        // messages: Bundle class, generated defaults merged with the hand-written bundle at run time, session locale aware
         Object action = save.getInstance(Object.class);
         assertEquals("Save/x saved in 12 ms", action.getClass().getMethod("text").invoke(action));
         LocaleContext.set(Locale.GERMAN);
         assertEquals("Speichern/x saved in 12 ms", action.getClass().getMethod("text").invoke(action));
         LocaleContext.set(null);
-        Map<String, String> props = Compile.properties(c.read("org/example/accounts/Bundle.properties"));
-        assertEquals("From source", props.get("CTL_Existing"));
+        Map<String, String> props = Compile.properties(c.read("org/example/accounts/Bundle-generated.properties"));
         assertEquals("Save", props.get("CTL_Save"));
         assertEquals("{0} saved in {1} ms", props.get("MSG_Saved"));
-        assertTrue(c.read("org/example/accounts/Bundle.properties").contains("# a comment"));
+        assertEquals(null, props.get("CTL_Existing"));
+        assertTrue(c.read("org/example/accounts/Bundle-generated.properties").contains("# a comment"));
+        // the developer's Bundle.properties is left alone
+        assertEquals("CTL_Existing=From source\n", c.read("org/example/accounts/Bundle.properties"));
+        ResourceBundle merged = Bundles.getBundle(c.loader(), "org.example.accounts.Bundle", Locale.ENGLISH);
+        assertEquals("From source", merged.getString("CTL_Existing"));
+        assertEquals("Save", merged.getString("CTL_Save"));
+        assertEquals(new java.util.TreeSet<String>(Arrays.asList("CTL_Existing", "CTL_Save", "MSG_Saved")),
+                new java.util.TreeSet<String>(merged.keySet()));
 
         // the registry view respects the session locale for #KEY attributes too
         RegistryContext.set(RegistryContext.of(null, Locale.GERMAN));
@@ -226,5 +235,64 @@ public class WbProcessorTest {
             }
         }
         return false;
+    }
+
+    /**
+     * A build that passes no {@code -sourcepath} and copies resources only after javac (NetBeans' Ant projects,
+     * Gradle): the hand-written bundle is still found for the duplicate check, and nothing the processor writes
+     * can be overwritten by the later copy.
+     */
+    @Test
+    public void messagesWithoutSourcePathOrEarlyResourceCopy() throws Exception {
+        Compile c = Compile.run(false, false, Collections.singletonList("-Awebbeans.module=ims.webcon"),
+                "ims.webcon.HelloAction",
+                "package ims.webcon;\n"
+                + "import org.webbeans.core.i18n.Messages;\n"
+                + "@Messages({\"CTL_SayHello=Say Hello\", \"MSG_Hello=Hello from {0}!\"})\n"
+                + "public class HelloAction { public String text() { return Bundle.CTL_SayHello() + \"|\" + Bundle.MSG_Hello(\"WebBeans\") + \"|\" + Bundle.CTL_Other(); } }\n",
+                "ims.webcon.Other",
+                "package ims.webcon;\n"
+                + "@org.webbeans.core.i18n.Messages(\"CTL_Other=Other\")\n"
+                + "public class Other { }\n",
+                "res:ims/webcon/Bundle.properties", "CTL_Written=By hand\n",
+                "res:ims/webcon/Bundle_de.properties", "CTL_SayHello=Hallo sagen\n");
+        assertTrue(c.log, c.ok);
+        assertTrue(c.exists("ims/webcon/Bundle-generated.properties"));
+        assertFalse("the processor must not write Bundle.properties", c.exists("ims/webcon/Bundle.properties"));
+
+        // the later resource copy of the build
+        for (String f : new String[] {"Bundle.properties", "Bundle_de.properties"}) {
+            java.nio.file.Files.copy(c.src.resolve("ims/webcon/" + f), c.out.resolve("ims/webcon/" + f));
+        }
+        ClassLoader loader = c.loader();
+        Object action = loader.loadClass("ims.webcon.HelloAction").newInstance();
+        assertEquals("Say Hello|Hello from WebBeans!|Other", action.getClass().getMethod("text").invoke(action));
+        LocaleContext.set(Locale.GERMAN);
+        assertEquals("Hallo sagen|Hello from WebBeans!|Other", action.getClass().getMethod("text").invoke(action));
+        LocaleContext.set(null);
+        ResourceBundle merged = Bundles.getBundle(loader, "ims.webcon.Bundle", Locale.ENGLISH);
+        assertEquals("By hand", merged.getString("CTL_Written"));
+        assertEquals("Say Hello", merged.getString("CTL_SayHello"));
+
+        // a package without any hand-written bundle works from the generated defaults alone
+        Compile d = Compile.run(false, false, Collections.<String>emptyList(),
+                "x.y.Only",
+                "package x.y;\n@org.webbeans.core.i18n.Messages(\"K=v\")\npublic class Only { public String k() { return Bundle.K(); } }\n");
+        assertTrue(d.log, d.ok);
+        Object only = d.loader().loadClass("x.y.Only").newInstance();
+        assertEquals("v", only.getClass().getMethod("k").invoke(only));
+        assertEquals("v", Bundles.resolve(d.loader(), "x.y.Bundle", "#K", Locale.ENGLISH));
+    }
+
+    @Test
+    public void keyInBothBundleAndMessagesIsAnErrorEvenWithoutSourcePath() throws Exception {
+        Compile c = Compile.run(false, false, Collections.<String>emptyList(),
+                "ims.webcon.HelloAction",
+                "package ims.webcon;\n"
+                + "@org.webbeans.core.i18n.Messages(\"CTL_SayHello=Say Hello\")\n"
+                + "public class HelloAction { }\n",
+                "res:ims/webcon/Bundle.properties", "CTL_SayHello=Already here\n");
+        assertFalse(c.log, c.ok);
+        assertTrue(c.errors().toString(), c.errors().get(0).startsWith("Key CTL_SayHello is both in Bundle.properties and in @Messages"));
     }
 }

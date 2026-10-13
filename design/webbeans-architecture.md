@@ -1,4 +1,4 @@
-# WebBeans — Architecture Design v0.8
+# WebBeans — Architecture Design v0.9
 
 A rich web application platform modelled on the NetBeans Platform. All application code — UI definition, business logic — is server-side Java (JDK 8) on the class path. The browser runs a thin, generated JavaScript runtime that mirrors the server-side component tree.
 
@@ -14,7 +14,7 @@ Document map: `design/README.md` lists every design document and the developer d
 | Transport | WebSocket (Jetty's native WebSocket API, one socket per tab) with automatic long-poll fallback; JSON control channel; blobs over HTTP (`/wb/blob/<sha256>`), a binary side-channel later |
 | v1 UI scope | Window system, Explorer/Nodes API (tree view, outline view), Actions, menus/toolbars, dialogs, a full standard component library (forms, layouts, tables), simple charts, Scene3D |
 | Persistence | Plain per-user files under `<datadir>/users/<username>/` (layouts, preferences); no database dependency |
-| i18n | NetBeans `org-openide-util`: `Bundle.properties`, `@Messages`, `NbBundle`; locale per session |
+| i18n | NetBeans bundle conventions (`Bundle.properties`, `Bundle_<locale>`, `Bundle_<brand>`) with WebBeans' own lookup (`Bundles`): locale per session, `@Messages` defaults in a generated `Bundle-generated.properties` merged at run time |
 | Browser tabs | Multiple `UI` instances per `UISession`, each with its own window layout |
 | Lookup | NetBeans `org-openide-util-lookup` (RELEASE126) used as-is, not re-implemented |
 | Registration | Annotations only; no `layer.xml`. The processor generates a Java `RegistrationProvider` per jar feeding a path-keyed `Registry` |
@@ -99,7 +99,7 @@ Detailed design: `design/sessions-and-delta-protocol.md`.
 
 ## 7. i18n (NetBeans style, NetBeans library)
 
-- `org-openide-util` provides `NbBundle.getMessage(...)`, `@Messages` → generated `Bundle.java` + merged `Bundle.properties`, and `Bundle_<branding>_<locale>.properties` branding.
+- `org.webbeans.core.i18n.Bundles` provides the lookup (NetBeans' file conventions and suffix chain, `Bundle_<branding>_<locale>.properties` branding, session locale); `@Messages` → generated `Bundle.java` + `Bundle-generated.properties`, merged at run time with the hand-written `Bundle*.properties` so the processor never overwrites a developer's file.
 - Locale per session: `UISession.getLocale()` (user preference → `Accept-Language` → server default) is exposed to `NbBundle` through a thread-local set by the session executor for the duration of each task.
 - Registry attributes written as `#KEY` resolve against the registering jar's bundle with the session locale, so display names of actions, modes and components are localised per session.
 - Localisation happens entirely on the server: renderers receive already-localised strings, so client JS never needs resource bundles. Number/date formats are compiled server-side into locale-specific specs for the few places the client formats (chart tooltips, number/date fields).
@@ -266,6 +266,7 @@ Detailed design: `design/scene3d.md`.
 
 ## 19. Change log
 
+- v0.9 — step 15: i18n lookup in `Bundles` (NetBeans file conventions, no `NbBundle` at run time); `@Messages` defaults in `Bundle-generated.properties` merged with hand-written `Bundle*.properties` at run time, so the processor never overwrites a developer's file whatever the build's resource-copy order.
 - v0.8 — step 14: the module system is removed; the application is the class path (§3 rewritten: discovery through `META-INF/services`, `Installer` hooks, no isolation or versions); step 13's HTTPS recorded, its run-time module loading withdrawn with the module system.
 - v0.7 — step 12: the tier-2/3 components of `design/standard-components.md` v0.3 (§8 list extended), `EnumLabels`/`Labeled` as the one place enum display is decided, Quick Search (`QuickSearch/Providers`) in the actions module, `Markdown` moved to `org.webbeans.ui.text`; roadmap updated (no map component: needs a vendored tile library).
 - v0.6 — step 11: the standard component library of §8 is complete as specified in `design/standard-components.md` v0.2 (inputs, Form, containers, lists, Table, uploads, downloads); roadmap updated.

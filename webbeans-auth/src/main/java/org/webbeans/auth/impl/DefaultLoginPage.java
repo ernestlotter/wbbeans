@@ -137,11 +137,8 @@ public final class DefaultLoginPage implements LoginPage {
         if (!text.startsWith("#")) {
             return text;
         }
-        String r = Bundles.resolve(p.getClass().getClassLoader(), Bundles.bundleNameOf(p.getClass()), text, locale);
-        if (r.equals(text)) {
-            r = msg(locale, text);
-        }
-        return r;
+        String r = Bundles.find(p.getClass().getClassLoader(), Bundles.bundleNameOf(p.getClass()), text.substring(1), locale);
+        return r != null ? r : msg(locale, text);
     }
 
     public static String msg(Locale locale, String text) {

@@ -32,7 +32,7 @@ The demo's first start prints a generated `admin` password (or pass `--admin-pas
 
 ```
 webbeans-tutorial/
-  src/main/java/org/webbeans/tutorial/*.java       # Bundle.properties is generated next to them by @Messages
+  src/main/java/org/webbeans/tutorial/*.java       # @Messages on these generate Bundle-generated.properties
   src/main/java/org/webbeans/tutorial/package-info.java   # package-level registrations (help pages)
   src/main/resources/org/webbeans/tutorial/*.svg    # icons
   src/main/resources/org/webbeans/tutorial/help/*.md      # help pages (§15)

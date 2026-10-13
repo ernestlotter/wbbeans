@@ -81,7 +81,7 @@ build_module() {   # name  classpath  extra-javac-flags
   local gen="$OUT/$name/generated-sources"
   rm -rf "$out" "$gen"; mkdir -p "$out" "$gen"
   echo "== compiling $name"
-  # resources first: the annotation processor may write merged Bundle.properties over the copies
+  # resources first, so the processor sees a hand-written Bundle.properties in the class output as well
   [ -d "$res" ] && cp -r "$res/." "$out/"
   (cd "$src" && find . -type f ! -name '*.java' -exec cp --parents {} "$out/" \;)
   # shellcheck disable=SC2086

@@ -158,7 +158,7 @@ public final class Main {
         }
 
         if (branding != null && !branding.isEmpty()) {
-            org.openide.util.NbBundle.setBranding(branding);   // Bundle_<branding>.properties overlays every bundle
+            org.webbeans.core.i18n.Bundles.setBranding(branding);   // Bundle_<branding>.properties overlays every bundle
         }
         final Platform platform = Platform.start(new Platform.Config().dataDir(dataDir));
         if (!noDefaultAdmin) {

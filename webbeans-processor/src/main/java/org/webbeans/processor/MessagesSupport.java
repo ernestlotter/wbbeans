@@ -1,9 +1,12 @@
 package org.webbeans.processor;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.Writer;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -19,6 +22,7 @@ import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.ElementKind;
 import javax.tools.Diagnostic;
 import javax.tools.FileObject;
 import javax.tools.JavaFileObject;
@@ -29,12 +33,20 @@ import org.webbeans.processor.spi.RegistrationModel;
 
 /**
  * {@code @Messages} support: collects {@code KEY=value} lines per package, generates the package-private
- * {@code Bundle} class (per round, so user code compiles against it) and merges the keys into the package's
- * {@code Bundle.properties} in the class output at the end.
+ * {@code Bundle} class (per round, so user code compiles against it) and writes the keys to the package's
+ * {@code Bundle-generated.properties} in the class output at the end.
+ *
+ * <p>The processor never touches {@code Bundle.properties}: that file stays the developer's, is copied by the
+ * build like any resource, and the runtime ({@code org.webbeans.core.i18n.Bundles}) merges the two with the
+ * hand-written keys winning. The hand-written file is still looked up here, best effort, to report a key that is
+ * declared in both places.
  */
 final class MessagesSupport {
 
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{(\\d+)");
+    /** Written next to {@code Bundle.properties}; read by {@code org.webbeans.core.i18n.Bundles}. */
+    static final String GENERATED_FILE = "Bundle-generated.properties";
+    static final String GENERATED_HEADER = "# Generated from @Messages by the WebBeans annotation processor";
 
     private final ProcessingEnvironment env;
     /** Packages whose Bundle.java has been generated, with the keys it contains. */
@@ -43,6 +55,8 @@ final class MessagesSupport {
     private final Set<String> pending = new HashSet<String>();
     private final Map<String, List<Element>> originsByPackage = new LinkedHashMap<String, List<Element>>();
     private final Map<String, List<String>> commentsByPackage = new LinkedHashMap<String, List<String>>();
+    /** Source directories of the annotated elements, per package (where a hand-written Bundle.properties would be). */
+    private final Map<String, Set<File>> sourceDirsByPackage = new LinkedHashMap<String, Set<File>>();
 
     MessagesSupport(ProcessingEnvironment env) {
         this.env = env;
@@ -75,7 +89,10 @@ final class MessagesSupport {
             }
             model.message(pkg, key, value, element);
             pending.add(pkg);
-            origins(pkg).add(element);
+            if (!origins(pkg).contains(element)) {
+                origins(pkg).add(element);
+                recordSourceDir(pkg, element);
+            }
         }
     }
 
@@ -140,32 +157,28 @@ final class MessagesSupport {
         return max + 1;
     }
 
-    /** Merges the collected keys into each package's {@code Bundle.properties} (source copy + generated keys). */
+    /** Writes each package's {@code @Messages} keys to {@code Bundle-generated.properties} in the class output. */
     void writeProperties(RegistrationModel model) throws IOException {
         Filer filer = env.getFiler();
         for (Map.Entry<String, Map<String, String>> e : model.getMessages().entrySet()) {
             String pkg = e.getKey();
-            Properties existing = readSourceBundle(filer, pkg);
+            Properties existing = findWrittenBundle(filer, pkg);
             for (String key : e.getValue().keySet()) {
                 if (existing.containsKey(key)) {
                     env.getMessager().printMessage(Diagnostic.Kind.ERROR,
-                            "Key " + key + " is both in Bundle.properties and in @Messages of package " + pkg,
+                            "Key " + key + " is both in Bundle.properties and in @Messages of package " + pkg
+                            + " (the Bundle.properties value would win at run time)",
                             origins(pkg).isEmpty() ? null : origins(pkg).get(0));
                 }
             }
-            FileObject out = filer.createResource(StandardLocation.CLASS_OUTPUT, pkg, "Bundle.properties",
+            FileObject out = filer.createResource(StandardLocation.CLASS_OUTPUT, pkg, GENERATED_FILE,
                     origins(pkg).toArray(new Element[0]));
             OutputStream os = out.openOutputStream();
             try {
                 Writer w = new java.io.OutputStreamWriter(os, "ISO-8859-1");
-                if (!existing.isEmpty()) {
-                    w.write("# Copied from the source Bundle.properties\n");
-                    for (String key : new java.util.TreeSet<String>(existing.stringPropertyNames())) {
-                        w.write(escape(key, true) + "=" + escape(existing.getProperty(key), false) + "\n");
-                    }
-                    w.write("\n");
-                }
-                w.write("# Generated from @Messages\n");
+                w.write(GENERATED_HEADER + "\n");
+                w.write("# Base-locale defaults of the @Messages in package " + (pkg.isEmpty() ? "(default)" : pkg)
+                        + ". Do not edit: Bundle.properties and Bundle_<locale>.properties override these keys.\n");
                 for (String c : comments(pkg)) {
                     w.write(c + "\n");
                 }
@@ -212,22 +225,116 @@ final class MessagesSupport {
         return sb.toString();
     }
 
-    private static Properties readSourceBundle(Filer filer, String pkg) {
+    /**
+     * The developer's {@code Bundle.properties} of a package, if it can be found: on the source path (Maven, the
+     * offline build), next to the source file of an annotated element (any build whose sources are laid out by
+     * package, including NetBeans' Ant projects and Gradle, which pass no {@code -sourcepath}), or already copied
+     * into the class output. Empty when there is none or the build hides it.
+     */
+    private Properties findWrittenBundle(Filer filer, String pkg) {
         Properties p = new Properties();
+        if (load(p, sourcePathBundle(filer, pkg)) || load(p, sourceDirBundle(pkg))) {
+            return p;
+        }
         try {
-            FileObject f = filer.getResource(StandardLocation.SOURCE_PATH, pkg, "Bundle.properties");
-            InputStream in = f.openInputStream();
+            FileObject f = filer.getResource(StandardLocation.CLASS_OUTPUT, pkg, "Bundle.properties");
+            String content = f.getCharContent(true).toString();
+            if (!content.contains("# Generated from @Messages")) {   // not a stale merged file of an earlier processor
+                p.load(new java.io.StringReader(content));
+            }
+        } catch (IOException e) {
+            // not copied before compilation (or not at all): nothing to check against
+        } catch (IllegalArgumentException e) {
+            // some compilers reject the lookup
+        }
+        return p;
+    }
+
+    private static InputStream sourcePathBundle(Filer filer, String pkg) {
+        try {
+            return filer.getResource(StandardLocation.SOURCE_PATH, pkg, "Bundle.properties").openInputStream();
+        } catch (IOException e) {
+            return null;    // no source bundle, or no source path configured
+        } catch (IllegalArgumentException e) {
+            return null;    // some compilers reject SOURCE_PATH lookups
+        }
+    }
+
+    /** {@code Bundle.properties} in the directory of an annotated element's source file (recorded while collecting). */
+    private InputStream sourceDirBundle(String pkg) {
+        Set<File> dirs = sourceDirsByPackage.get(pkg);
+        if (dirs != null) {
+            for (File dir : dirs) {
+                File bundle = new File(dir, "Bundle.properties");
+                if (bundle.isFile()) {
+                    try {
+                        return new FileInputStream(bundle);
+                    } catch (IOException e) {
+                        return null;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Remembers the source directory of an annotated element, found through javac's
+     * {@code com.sun.source.util.Trees} (used reflectively: it is not part of the processor's compile-time API and
+     * other compilers do not have it). Must happen in the round that sees the element: javac re-enters the
+     * sources every round, so an element of an earlier round has no tree any more.
+     */
+    private void recordSourceDir(String pkg, Element element) {
+        Element top = element;
+        while (top.getEnclosingElement() != null && top.getEnclosingElement().getKind() != ElementKind.PACKAGE) {
+            top = top.getEnclosingElement();
+        }
+        try {
+            // the compiler's own loader sees the API whether or not the processor's does (tests, IDEs)
+            ClassLoader javac = env.getClass().getClassLoader();
+            Class<?> treesClass = Class.forName("com.sun.source.util.Trees", true, javac);
+            Object trees = treesClass.getMethod("instance", ProcessingEnvironment.class).invoke(null, env);
+            Object path = treesClass.getMethod("getPath", Element.class).invoke(trees, top);
+            if (path == null) {
+                return;
+            }
+            Object unit = Class.forName("com.sun.source.util.TreePath", true, javac).getMethod("getCompilationUnit").invoke(path);
+            Object source = Class.forName("com.sun.source.tree.CompilationUnitTree", true, javac).getMethod("getSourceFile").invoke(unit);
+            URI uri = (URI) javax.tools.FileObject.class.getMethod("toUri").invoke(source);
+            if (!"file".equals(uri.getScheme())) {
+                return;
+            }
+            File dir = new File(uri).getParentFile();
+            if (dir != null) {
+                Set<File> dirs = sourceDirsByPackage.get(pkg);
+                if (dirs == null) {
+                    dirs = new java.util.LinkedHashSet<File>();
+                    sourceDirsByPackage.put(pkg, dirs);
+                }
+                dirs.add(dir);
+            }
+        } catch (ReflectiveOperationException e) {
+            // not javac: no Trees API
+        } catch (RuntimeException e) {
+            // an element without a source, an opaque URI, ...
+        }
+    }
+
+    /** Loads and closes; false if there was nothing to load. */
+    private static boolean load(Properties p, InputStream in) {
+        if (in == null) {
+            return false;
+        }
+        try {
             try {
                 p.load(in);
             } finally {
                 in.close();
             }
+            return true;
         } catch (IOException e) {
-            // no source bundle (or no source path configured): nothing to merge
-        } catch (IllegalArgumentException e) {
-            // some compilers reject SOURCE_PATH lookups
+            return false;
         }
-        return p;
     }
 
     private List<Element> origins(String pkg) {
