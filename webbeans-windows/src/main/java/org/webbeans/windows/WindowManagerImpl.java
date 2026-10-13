@@ -17,6 +17,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.openide.util.Lookup;
+import org.openide.util.LookupEvent;
+import org.openide.util.LookupListener;
 import org.openide.util.lookup.ProxyLookup;
 import org.webbeans.core.files.UserFiles;
 import org.webbeans.core.i18n.Bundles;
@@ -52,6 +54,19 @@ public final class WindowManagerImpl extends WindowManager {
         }
     }
 
+    /** {@code org.webbeans.nodes.Node} when the nodes module is on the class path (resolved by name: the window system is below it). */
+    private static final Class<?> NODE_CLASS = optionalClass("org.webbeans.nodes.Node");
+    private static final Class<?> EXPLORER_PROVIDER_CLASS = optionalClass("org.webbeans.explorer.ExplorerManager$Provider");
+
+    private static Class<?> optionalClass(String name) {
+        ClassLoader l = Lookup.getDefault().lookup(ClassLoader.class);
+        try {
+            return Class.forName(name, false, l != null ? l : WindowManagerImpl.class.getClassLoader());
+        } catch (ClassNotFoundException e) {
+            return null;
+        }
+    }
+
     private final UI ui;
     private final Dock dock = new Dock();
     private final UserFiles files;
@@ -60,6 +75,15 @@ public final class WindowManagerImpl extends WindowManager {
     private final Map<String, TopComponent> components = new LinkedHashMap<String, TopComponent>();
     private final Map<String, GroupImpl> groups = new LinkedHashMap<String, GroupImpl>();
     private final GlobalContext globalContext = new GlobalContext();
+    /** The lookup of {@link #nodesOwner}; a result on it fires {@code PROP_ACTIVATED_NODES} across retargets. */
+    private final GlobalContext nodesContext = new GlobalContext();
+    private final Lookup.Result<?> nodesResult;
+
+    private static Lookup.Result<?> resultFor(Lookup l, Class<?> type) {
+        return l.lookupResult(type);
+    }
+    private List<Object> activatedNodes = Collections.emptyList();
+    private TopComponent nodesOwner;
     private TopComponent activated;
     private boolean ready;
     private final List<Runnable> whenReady = new ArrayList<Runnable>();
@@ -69,6 +93,13 @@ public final class WindowManagerImpl extends WindowManager {
     private WindowManagerImpl(UI ui) {
         this.ui = ui;
         this.files = ui.getSession().getUserFiles();
+        nodesResult = resultFor(nodesContext, NODE_CLASS != null ? NODE_CLASS : Object.class);
+        nodesResult.addLookupListener(new LookupListener() {
+            @Override
+            public void resultChanged(LookupEvent ev) {
+                fireActivatedNodes();
+            }
+        });
         wireDockEvents();
         ui.getSession().subscribe(UISession.LocaleChangeEvent.class, new Consumer<UISession.LocaleChangeEvent>() {
             @Override
@@ -434,18 +465,44 @@ public final class WindowManagerImpl extends WindowManager {
     }
 
     @Override
+    public Lookup getActivatedNodesContext() {
+        return nodesContext;
+    }
+
+    @Override
     Collection<?> getActivatedNodes() {
-        if (activated == null) {
-            return Collections.emptyList();
+        return activatedNodes;
+    }
+
+    /** NetBeans' {@code getActivatedNodes() != null}: see {@link TopComponent#setActivatedNodesOwner}. */
+    private static boolean ownsNodes(TopComponent tc) {
+        Boolean explicit = tc.getActivatedNodesOwner();
+        if (explicit != null) {
+            return explicit;
         }
-        // the Nodes API is a separate module layered above the window system: resolve its base class by name
-        ClassLoader l = Lookup.getDefault().lookup(ClassLoader.class);
-        try {
-            Class<?> node = Class.forName("org.webbeans.nodes.Node", false, l != null ? l : getClass().getClassLoader());
-            return new ArrayList<Object>(activated.getLookup().lookupAll(node));
-        } catch (ClassNotFoundException e) {
-            return Collections.emptyList();
+        if (EXPLORER_PROVIDER_CLASS != null && EXPLORER_PROVIDER_CLASS.isInstance(tc)) {
+            return true;
         }
+        return NODE_CLASS != null && !tc.getLookup().lookupAll(NODE_CLASS).isEmpty();
+    }
+
+    private void setNodesOwner(TopComponent tc) {
+        if (nodesOwner == tc) {
+            return;
+        }
+        nodesOwner = tc;
+        nodesContext.retarget(tc == null ? null : tc.getLookup());   // the result listener fires the change
+        fireActivatedNodes();
+    }
+
+    private void fireActivatedNodes() {
+        List<Object> now = new ArrayList<Object>(nodesResult.allInstances());
+        if (now.equals(activatedNodes)) {
+            return;
+        }
+        List<Object> old = activatedNodes;
+        activatedNodes = Collections.unmodifiableList(now);
+        getRegistry().fire(Registry.PROP_ACTIVATED_NODES, old, activatedNodes);
     }
 
     @Override
@@ -627,6 +684,9 @@ public final class WindowManagerImpl extends WindowManager {
         if (activated == tc) {
             setActivated(null);
         }
+        if (nodesOwner == tc) {
+            setNodesOwner(null);
+        }
         tc.fireShowing(false);
         String next = null;
         if (node != null) {
@@ -740,6 +800,9 @@ public final class WindowManagerImpl extends WindowManager {
         layout.active = tc == null ? null : tc.getTopComponentId();
         dock.set(Dock.ACTIVE, layout.active);
         globalContext.retarget(tc == null ? null : tc.getLookup());
+        if (tc != null && ownsNodes(tc)) {
+            setNodesOwner(tc);
+        }
         if (tc != null) {
             tc.fireActive(true);
         }

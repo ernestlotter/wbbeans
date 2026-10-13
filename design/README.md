@@ -8,7 +8,7 @@
 | `design/module-system-and-lookup.md` | Step 1 (revised in steps 14 and 15): the class path as the application, Registry, NetBeans Lookup integration, i18n (`Bundles`, `@Messages`, `Bundle-generated.properties`), annotation processor, `Installer` hooks | v0.5 |
 | `design/sessions-and-delta-protocol.md` | Steps 2, 10: Jetty HTTP surface, auth, sessions/UIs, threading, component model, wire protocol over WebSocket and long polling, `wb-core.js` | v0.3 |
 | `design/standard-components.md` | Steps 2, 11, 12: the standard component library as built — inputs, Form, layouts, SplitPane/ScrollPane, Table, ListBox, Tree, Upload, downloads; tier-2/3: small widgets, Card/Accordion/Popover, TreeTable, PropertyGrid, code/Markdown/diff/output views, Calendar, Kanban, Diagram/Palette, viewers, Quick Search | v0.3 |
-| `design/window-system.md` | Step 3: TopComponent, Mode, WindowManager, layout model, dock renderer | v0.2 |
+| `design/window-system.md` | Step 3 (revised in step 15): TopComponent, Mode, WindowManager, activated nodes, layout model, dock renderer | v0.3 |
 | `design/nodes-and-explorer.md` | Step 4: Node, Children, properties/editors, ExplorerManager, views, DnD, persistence | v0.3 |
 | `design/actions-menus-dialogs.md` | Steps 5, 8, 9: actions, menus, toolbars, shortcuts, popups, dialogs, notifications, progress, options, help (as built) | v0.3 |
 | `design/charts.md` | Step 6: Chart component, model, wire format, SVG renderer, export | v0.2 |

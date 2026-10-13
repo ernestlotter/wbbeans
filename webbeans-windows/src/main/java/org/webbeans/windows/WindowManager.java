@@ -38,7 +38,10 @@ public abstract class WindowManager {
             return wm.getActivated();
         }
 
-        /** The objects of the activated component's lookup that the Nodes API (step 4) marks as nodes; empty for now. */
+        /**
+         * The activated nodes: the {@code Node}s in {@link WindowManager#getActivatedNodesContext()} — the selection
+         * of the most recently activated window that owns nodes. {@link #PROP_ACTIVATED_NODES} fires when they change.
+         */
         public Collection<?> getActivatedNodes() {
             return wm.getActivatedNodes();
         }
@@ -89,6 +92,16 @@ public abstract class WindowManager {
 
     /** A lookup that always reflects the activated component's lookup (NetBeans' {@code actionsGlobalContext}). */
     public abstract Lookup getGlobalContext();
+
+    /**
+     * The lookup of the window that owns the <em>activated nodes</em>: the most recently activated window that is
+     * a node owner (see {@link TopComponent#setActivatedNodesOwner}) — an explorer, typically. Unlike
+     * {@link #getGlobalContext()} it does not move to a window without nodes (a properties sheet, an output
+     * window), so a Properties window bound to it keeps showing the explorer's selection while the user clicks
+     * and edits in it; activating an explorer with nothing selected does clear it. NetBeans:
+     * {@code TopComponent.getRegistry().getActivatedNodes()}.
+     */
+    public abstract Lookup getActivatedNodesContext();
 
     public Registry getRegistry() {
         return registry;

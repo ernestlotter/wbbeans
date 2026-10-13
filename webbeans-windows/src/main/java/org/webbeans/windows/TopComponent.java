@@ -55,6 +55,7 @@ public abstract class TopComponent extends Panel implements HelpCtx.Provider {
     private boolean opened;
     private boolean showing;
     private boolean active;
+    private Boolean activatedNodesOwner;
     private Mode mode;
     private HelpCtx helpCtx;
 
@@ -193,6 +194,22 @@ public abstract class TopComponent extends Panel implements HelpCtx.Provider {
     }
 
     /** Whether the user may close the tab; {@link #close()} still works. Default true. */
+    /**
+     * Whether activating this window makes its lookup the source of the activated nodes
+     * ({@link WindowManager#getActivatedNodesContext()}, {@code getRegistry().getActivatedNodes()}) — NetBeans'
+     * {@code getActivatedNodes() != null}. {@code null} (the default) decides automatically: a window is an owner
+     * when it is an {@code ExplorerManager.Provider} or its lookup holds a node at the moment it is activated. Set
+     * {@code false} on a window that shows nodes without owning them (a properties sheet), {@code true} on a
+     * custom window whose lookup may be empty but should still take the activated nodes over when clicked.
+     */
+    public final void setActivatedNodesOwner(Boolean owner) {
+        this.activatedNodesOwner = owner;
+    }
+
+    public final Boolean getActivatedNodesOwner() {
+        return activatedNodesOwner;
+    }
+
     public final void setClosable(boolean b) {
         set(CLOSABLE, b);
     }

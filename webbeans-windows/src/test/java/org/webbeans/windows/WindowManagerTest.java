@@ -325,6 +325,91 @@ public class WindowManagerTest {
         });
     }
 
+    /** Without the nodes module on the class path the activated "nodes" are every object of the lookup chain; the test data are the Strings. */
+    private static List<String> strings(java.util.Collection<?> c) {
+        List<String> out = new ArrayList<String>();
+        for (Object o : c) {
+            if (o instanceof String) {
+                out.add((String) o);
+            }
+        }
+        return out;
+    }
+
+    /** A window with a selection in its lookup, as ExplorerUtils.createLookup would build it. */
+    private static final class ExplorerTC extends LoggingTC {
+        final org.openide.util.lookup.InstanceContent content = new org.openide.util.lookup.InstanceContent();
+
+        ExplorerTC(String name) {
+            super(name);
+            associateLookup(new org.openide.util.lookup.AbstractLookup(content));
+            setActivatedNodesOwner(true);     // the windows module alone has no Node class: say so explicitly
+        }
+    }
+
+    @Test
+    public void activatedNodesStayWithTheirOwnerUntilAnotherOwnerIsActivated() {
+        run(new Runnable() {
+            @Override
+            public void run() {
+                ExplorerTC explorer = new ExplorerTC("Explorer");
+                ExplorerTC other = new ExplorerTC("Other");
+                LoggingTC props = new LoggingTC("Props");          // no nodes, not an owner
+                explorer.open();
+                other.open();
+                props.open();
+                final List<Object> changes = new ArrayList<Object>();
+                wm.getRegistry().addPropertyChangeListener(new PropertyChangeListener() {
+                    @Override
+                    public void propertyChange(PropertyChangeEvent e) {
+                        if (WindowManager.Registry.PROP_ACTIVATED_NODES.equals(e.getPropertyName())) {
+                            changes.add(e.getNewValue());
+                        }
+                    }
+                });
+                explorer.content.add("n1");
+                explorer.requestActive();
+                assertEquals(Arrays.asList("n1"), strings(wm.getRegistry().getActivatedNodes()));
+                assertEquals("n1", wm.getActivatedNodesContext().lookup(String.class));
+                assertEquals(1, changes.size());
+
+                // clicking the properties window moves the global context but not the activated nodes
+                props.requestActive();
+                assertSame(props, wm.getActivated());
+                assertNull(wm.getGlobalContext().lookup(String.class));
+                assertEquals("n1", wm.getActivatedNodesContext().lookup(String.class));
+                assertEquals(1, changes.size());
+
+                // the owner's selection changes while another window is active: the nodes follow
+                explorer.content.add("n2");
+                assertEquals(Arrays.asList("n1", "n2"), strings(wm.getRegistry().getActivatedNodes()));
+                assertEquals(2, changes.size());
+
+                // another owner with nothing selected takes over: empty, as in NetBeans
+                other.requestActive();
+                assertTrue(strings(wm.getRegistry().getActivatedNodes()).isEmpty());
+                assertEquals(3, changes.size());
+                other.content.add("o1");
+                assertEquals(Arrays.asList("o1"), strings(wm.getRegistry().getActivatedNodes()));
+
+                // closing the owner clears them
+                other.close();
+                assertTrue(strings(wm.getRegistry().getActivatedNodes()).isEmpty());
+                assertNull(wm.getActivatedNodesContext().lookup(String.class));
+
+                // an explicit opt-out keeps a window with nodes from taking over
+                explorer.requestActive();
+                assertEquals("n1", wm.getActivatedNodesContext().lookup(String.class));
+                ExplorerTC viewer = new ExplorerTC("Viewer");
+                viewer.setActivatedNodesOwner(false);
+                viewer.content.add("v1");
+                viewer.open();
+                viewer.requestActive();
+                assertEquals("n1", wm.getActivatedNodesContext().lookup(String.class));
+            }
+        });
+    }
+
     @Test
     public void dockEventsMoveSplitMaximizeFloatMinimize() {
         run(new Runnable() {

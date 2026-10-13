@@ -1,6 +1,6 @@
-# WebBeans — Window System (detailed design v0.2)
+# WebBeans — Window System (detailed design v0.3)
 
-Roadmap step 3. JDK 8. **v0.2 reflects the implementation** (`webbeans-windows`, `webbeans-windows-processor`; notes in `impl/step3-notes.md`). Package: `org.webbeans.windows` (API and implementation; implementation classes are `WindowManagerImpl`, `LayoutModel`, `Dock`, `MainWindow`). Client renderers `dock.js`, `topcomponent.js`, `mainwindow.js`, `statusbar.js` + `windows.css`. Depends on step 1 (registry, Lookup) and step 2 (`UI`, component model, deltas).
+Roadmap step 3. JDK 8. **v0.3** (step 15): activated nodes separate from the global context, layout `*` invariant (§ Activation, end). **v0.2 reflects the implementation** (`webbeans-windows`, `webbeans-windows-processor`; notes in `impl/step3-notes.md`). Package: `org.webbeans.windows` (API and implementation; implementation classes are `WindowManagerImpl`, `LayoutModel`, `Dock`, `MainWindow`). Client renderers `dock.js`, `topcomponent.js`, `mainwindow.js`, `statusbar.js` + `windows.css`. Depends on step 1 (registry, Lookup) and step 2 (`UI`, component model, deltas).
 
 ## 1. Scope and NetBeans mapping
 
@@ -98,6 +98,7 @@ public abstract class WindowManager {
     public abstract TopComponent findTopComponent(String id);  public String findTopComponentID(TopComponent tc);
     public abstract Collection<TopComponent> getOpened();  public abstract TopComponent getActivated();
     public abstract Lookup getGlobalContext();                // ProxyLookup retargeted on activation
+    public abstract Lookup getActivatedNodesContext();        // ProxyLookup of the last activated node-owning window (step 15)
     public Registry getRegistry();                            // PROP_OPENED, PROP_ACTIVATED, PROP_ACTIVATED_NODES, PROP_TC_OPENED, PROP_TC_CLOSED
     public abstract TopComponentGroup findTopComponentGroup(String name);
     public abstract void setRole(String role);  public abstract String getRole();
@@ -185,7 +186,8 @@ Keyboard (`WindowManagerImpl.bindShortcuts()` through `UI.bindShortcut`): `Ctrl+
 ## 8. Lookup and selection integration
 
 - `WindowManager.getGlobalContext()` is a `ProxyLookup` retargeted on `PROP_ACTIVATED` to the activated component's lookup (own content over parent/UI/session). Context-aware actions (step 5) listen to it; the demo's Properties window shows the `Planet` found there.
-- `Registry.getActivatedNodes()` returns the activated lookup's nodes once the Nodes API (step 4) exists; empty for now.
+- **Activated nodes** (step 15) are NetBeans' `TopComponent.Registry.getActivatedNodes()`: `getActivatedNodesContext()` is a `ProxyLookup` retargeted only when the newly activated window *owns* nodes — `TopComponent.setActivatedNodesOwner(Boolean)`: explicit, else an `ExplorerManager.Provider` (resolved by class name, the window system sits below the nodes module), else a lookup holding a `Node` at activation. Clicking the Properties or Output window therefore moves the global context (actions) but not the nodes; activating an explorer with nothing selected clears them; closing the owner clears them. `Registry.getActivatedNodes()` is the `Node`s of that context and `PROP_ACTIVATED_NODES` fires (old/new lists) through one `Lookup.Result` on the proxy, so selection changes of the owner are reported even while another window is active. The demo's `PropertiesTopComponent` binds its sheet to it.
+- **Layout invariant** (step 15): every split keeps one `*` child; `LayoutModel.ensureStars()` restores it after a removal (closing the window that held the rest after a neighbour was resized), before every push and when a saved layout is applied.
 - A component in a minimised mode is not showing and is never the active one; `requestActive` docks the mode back first.
 
 ## 9. Threading and lifecycle

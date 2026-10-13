@@ -164,7 +164,7 @@ public final class PlanetsTopComponent extends TopComponent implements ExplorerM
 }
 ```
 
-Because `createLookup` puts the selected nodes and the contents of their lookups into the window's lookup, activating the window puts them into the global context (`WindowManager.getGlobalContext()`), which is what the Properties window and context-aware actions (step 5) observe — the NetBeans selection model.
+Because `createLookup` puts the selected nodes and the contents of their lookups into the window's lookup, activating the window puts them into the global context (`WindowManager.getGlobalContext()`, what context-aware actions observe) and makes the window the owner of the *activated nodes* (`WindowManager.getActivatedNodesContext()`, what a Properties window observes — it does not move when a window without nodes is activated, so clicking into the sheet keeps the selection) — the NetBeans selection model.
 
 ## 7. Views
 

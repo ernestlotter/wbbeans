@@ -23,8 +23,8 @@ import org.webbeans.windows.TopComponent;
 import org.webbeans.windows.WindowManager;
 
 /**
- * The NetBeans "Properties" window: a {@link PropertySheet} showing the nodes of the activated window's lookup
- * (the global context), plus a few window actions.
+ * The NetBeans "Properties" window: a {@link PropertySheet} showing the activated nodes
+ * ({@code WindowManager.getActivatedNodesContext()}), plus a few window actions.
  */
 @TopComponent.Registration(mode = "properties", openAtStartup = true, position = 100)
 @TopComponent.Description(preferredID = "PropertiesTC", iconBase = "org/webbeans/demo/icons/props.svg")
@@ -117,8 +117,9 @@ public final class PropertiesTopComponent extends TopComponent {
             }
         };
         wm.getRegistry().addPropertyChangeListener(listener);
-        // the global context changes with the activated window and with its selection
-        nodesResult = wm.getGlobalContext().lookupResult(Node.class);
+        // the activated nodes follow the last window that owns nodes (the explorer) and its selection — not this
+        // window: clicking or editing in the sheet must not clear it
+        nodesResult = wm.getActivatedNodesContext().lookupResult(Node.class);
         final UI ui = getUI();
         nodesListener = new LookupListener() {
             @Override

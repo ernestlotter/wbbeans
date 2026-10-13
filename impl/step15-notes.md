@@ -58,3 +58,20 @@ Nothing to configure beyond the processor path (`javac.processorpath` with the t
 `webbeans-core` and `org-openide-util-lookup`; `annotation.processing.processor.options=-Awebbeans.module=<pkg>`).
 A hand-written `src/<pkg>/Bundle.properties` is copied by the IDE's build after javac, the processor's
 `build/classes/<pkg>/Bundle-generated.properties` sits next to it, and both are in the jar.
+
+## 6. Two window-system fixes found while wiring a Properties window (same step)
+
+- **Empty strip beside the last mode.** A split's `*` child could be removed (drop a window beside the editor, drag the
+  gutter — which turns the editor's `*` into pixels — then close the window), leaving fixed sizes only; saved in
+  `layout.json`, it came back on every login. `LayoutModel.ensureStars()` restores the `*` (centre subtree first,
+  else the largest child) on collapse, before every push and when a saved layout is applied, so existing files
+  repair themselves. `WindowManagerTest.run()` now re-throws assertion failures from session tasks — the executor
+  only logged them, so the suite could not fail before.
+- **Clicking the Properties window cleared it.** The global context followed the activated window, so a sheet bound
+  to it emptied as soon as the user clicked into it (no editing possible). NetBeans keeps *activated nodes* separate:
+  `WindowManager.getActivatedNodesContext()` / `Registry.getActivatedNodes()` + `PROP_ACTIVATED_NODES` follow the
+  last activated window that owns nodes (`ExplorerManager.Provider`, a lookup with a `Node`, or
+  `TopComponent.setActivatedNodesOwner`), stay put for windows without nodes, clear when an explorer with no
+  selection is activated or the owner closes. `getGlobalContext()` is unchanged (actions still disable when the
+  sheet is active, as in NetBeans). Demo `PropertiesTopComponent` rebound; browser-checked (tab click, click in the
+  sheet, edit, selection change, Output window).
