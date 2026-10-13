@@ -225,6 +225,7 @@ public final class WindowManagerImpl extends WindowManager {
                 ensureModeNode(m.getName());
             }
         }
+        layout.ensureStars();   // a saved layout may have lost the child that takes the remaining space
         // components listed in the layout
         List<String> ids = layout.allTcs();
         Map<String, String> wanted = new LinkedHashMap<String, String>();
@@ -1051,6 +1052,7 @@ public final class WindowManagerImpl extends WindowManager {
 
     /** Sends the layout to the client if it changed (the property set is a no-op for an equal map). */
     void push() {
+        layout.ensureStars();
         dock.set(Dock.LAYOUT, layout.toJson());
     }
 

@@ -205,8 +205,25 @@ public class WindowManagerTest {
         WbDefaultLookup.getInstance().setContent(Lookups.metaInfServices(getClass().getClassLoader()));
     }
 
-    private void run(Runnable r) {
-        ui.access(r);
+    /** Runs on the session executor; the executor logs a failing task instead of throwing, so re-throw here. */
+    private void run(final Runnable r) {
+        final Throwable[] failure = new Throwable[1];
+        ui.access(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    r.run();
+                } catch (Throwable t) {
+                    failure[0] = t;
+                }
+            }
+        });
+        if (failure[0] instanceof Error) {
+            throw (Error) failure[0];
+        }
+        if (failure[0] != null) {
+            throw new AssertionError(failure[0]);
+        }
     }
 
     private static List<String> tcs(LayoutModel.ModeNode n) {
@@ -362,8 +379,34 @@ public class WindowManagerTest {
                 log.setClosable(true);
                 fire("close", map("tc", "Log"));
                 assertFalse(log.isOpened());
+                // the anonymous mode held the row's remaining space; closing it must not leave only fixed sizes
+                // (the editor was resized to 333px above) or the row stops filling the window
+                LayoutModel.Split editorRow = wm.getLayout().findMode("editor").parent;
+                assertTrue(editorRow.sizes.toString(), editorRow.sizes.contains(LayoutModel.STAR));
+                assertEquals(LayoutModel.STAR, editorRow.sizes.get(editorRow.children.indexOf(wm.getLayout().findMode("editor"))), 0.0);
             }
         });
+    }
+
+    @Test
+    public void savedLayoutWithoutRemainingSpaceIsRepaired() {
+        LayoutModel m = new LayoutModel();
+        m.setModeInfo("editor", Mode.Side.CENTER, 100);
+        m.setModeInfo("properties", Mode.Side.RIGHT, 100);
+        LayoutModel.Split row = new LayoutModel.Split("row");
+        row.add(0, new LayoutModel.ModeNode("editor"), 1540);
+        row.add(1, new LayoutModel.ModeNode("properties"), 300);
+        m.root = row;
+        m.ensureStars();
+        assertEquals(Arrays.asList(LayoutModel.STAR, 300.0), row.sizes);
+        // without a centre mode the largest child takes the rest
+        LayoutModel.Split col = new LayoutModel.Split("col");
+        col.add(0, new LayoutModel.ModeNode("properties"), 120);
+        col.add(1, new LayoutModel.ModeNode("other"), 400);
+        m.setModeInfo("other", Mode.Side.RIGHT, 200);
+        m.root = col;
+        m.ensureStars();
+        assertEquals(Arrays.asList(120.0, LayoutModel.STAR), col.sizes);
     }
 
     /** Injects a client event for the dock, as the transport would. */

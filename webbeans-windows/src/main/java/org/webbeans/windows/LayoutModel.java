@@ -16,7 +16,7 @@ import org.webbeans.core.json.Json;
 public final class LayoutModel {
 
     public static final int VERSION = 1;
-    static final double STAR = -1; // "the rest" in sizes
+    public static final double STAR = -1; // "the rest" in sizes
 
     /** A split or a mode. */
     public abstract static class Node {
@@ -36,7 +36,7 @@ public final class LayoutModel {
             this.dir = dir;
         }
 
-        void add(int index, Node n, double size) {
+        public void add(int index, Node n, double size) {
             children.add(index, n);
             sizes.add(index, size);
             n.parent = this;
@@ -459,7 +459,57 @@ public final class LayoutModel {
         collapse(p);
     }
 
+    /**
+     * Every split needs one child that takes the remaining space ({@link #STAR}); removing the child that had it
+     * (a closed window beside a resized editor, say) leaves only fixed sizes and the row no longer fills the
+     * window. Restores it, preferring the subtree with the centre area, then the largest child. Safe to call on
+     * any model, including layouts saved before this rule existed.
+     */
+    public void ensureStars() {
+        ensureStars(root);
+    }
+
+    private void ensureStars(Node n) {
+        if (!(n instanceof Split)) {
+            return;
+        }
+        Split s = (Split) n;
+        for (Node c : s.children) {
+            ensureStars(c);
+        }
+        if (s.children.isEmpty() || s.sizes.contains(STAR)) {
+            return;
+        }
+        int pick = -1;
+        for (int i = 0; i < s.children.size(); i++) {
+            if (hasCentre(s.children.get(i))) {
+                pick = i;
+            }
+        }
+        if (pick < 0) {
+            for (int i = 0; i < s.children.size(); i++) {
+                if (pick < 0 || s.sizes.get(i) > s.sizes.get(pick)) {
+                    pick = i;
+                }
+            }
+        }
+        s.sizes.set(pick, STAR);
+    }
+
+    private boolean hasCentre(Node n) {
+        if (n instanceof ModeNode) {
+            return sideOf(n) == Mode.Side.CENTER;
+        }
+        for (Node c : ((Split) n).children) {
+            if (hasCentre(c)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void collapse(Split s) {
+        ensureStars(s);
         Split p = s.parent;
         if (s.children.size() == 1 && p != null) {
             Node only = s.children.get(0);
