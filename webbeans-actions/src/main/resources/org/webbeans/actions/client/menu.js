@@ -31,6 +31,7 @@
       document.body.appendChild(dd); dd.classList.add('wb-dropdown-open'); menus.stack.push(dd);
       anchor.classList.add('wb-menu-open');
       menus.position(dd, anchor, place);
+      menus.clearFocus(dd);   // a stale focus from the last time the menu was open would survive otherwise
       menus.arm();
     },
     closeDropdown: function (dd) {
@@ -52,6 +53,8 @@
     },
     items: function (dd) { return Array.from(dd.querySelectorAll(':scope > .wb-menuitem:not(.wb-disabled), :scope > .wb-menu-sub:not(.wb-disabled)')); },
     focusItem: function (dd, idx) { var its = menus.items(dd); if (!its.length) return; idx = (idx + its.length) % its.length; its.forEach(function (i, k) { i.classList.toggle('wb-menu-focus', k === idx); }); dd.__focus = idx; },
+    /* no keyboard focus: nothing highlighted (focusItem(-1) would wrap to the last item) */
+    clearFocus: function (dd) { menus.items(dd).forEach(function (i) { i.classList.remove('wb-menu-focus'); }); dd.__focus = null; },
     key: function (e) {
       if (!menus.stack.length) return;
       var dd = menus.stack[menus.stack.length - 1]; var its = menus.items(dd); var cur = dd.__focus == null ? -1 : dd.__focus;
@@ -69,7 +72,14 @@
 
   function makeDropdown(ctx) {
     var dd = wb.h('div', 'wb-dropdown'); dd.setAttribute('role', 'menu'); dd.__ctx = ctx;
-    dd.addEventListener('mouseover', function (e) { var it = e.target.closest('.wb-menu-sub'); if (it && it.parentElement === dd && it.__open) it.__open(); var plain = e.target.closest('.wb-menuitem'); if (plain && plain.parentElement === dd) { var deeper = menus.stack.indexOf(dd) + 1; menus.stack.slice(deeper).reverse().forEach(menus.closeDropdown); } });
+    dd.addEventListener('mouseover', function (e) {
+      var it = e.target.closest('.wb-menu-sub'); if (it && it.parentElement === dd && it.__open) it.__open();
+      var plain = e.target.closest('.wb-menuitem'); if (plain && plain.parentElement === dd) { var deeper = menus.stack.indexOf(dd) + 1; menus.stack.slice(deeper).reverse().forEach(menus.closeDropdown); }
+      /* the mouse and the keyboard share one highlight: hovering moves the focus, so Enter runs the hovered item */
+      var hovered = e.target.closest('.wb-menuitem, .wb-menu-sub'); var k = hovered && hovered.parentElement === dd ? menus.items(dd).indexOf(hovered) : -1;
+      if (k >= 0) menus.focusItem(dd, k); else if (hovered && hovered.parentElement === dd) menus.clearFocus(dd);
+    });
+    dd.addEventListener('mouseleave', function () { if (dd.__focus != null && !dd.querySelector(':scope > .wb-menu-sub.wb-menu-open')) menus.clearFocus(dd); });
     return dd;
   }
 
@@ -152,7 +162,7 @@
         var anchor = { getBoundingClientRect: function () { return { left: args[0], top: args[1], right: args[0], bottom: args[1] }; } };
         document.body.appendChild(el.dd); el.dd.classList.add('wb-dropdown-open'); menus.stack.push(el.dd);
         menus.position(el.dd, anchor, 'at'); menus.arm();
-        menus.focusItem(el.dd, -1);
+        menus.clearFocus(el.dd);
       }
     },
     insertChild: function (el, child, i) { var ref = el.dd.children[i]; if (ref) el.dd.insertBefore(child, ref); else el.dd.appendChild(child); },
