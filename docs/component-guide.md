@@ -719,6 +719,44 @@ Types: `LINE, AREA, BAR, PIE, DONUT, SCATTER, STEP` (per series too: `addSeries(
 
 ---
 
+## 7a. Graph scenes — `GraphScene<N, E>` (`org.webbeans.graph`)
+
+The Visual Library model: your node and edge objects are mapped to widgets that decide how they look. Override `attachNodeWidget`/`attachEdgeWidget` to choose per object, or configure what `addNode`/`addEdge` return.
+
+```java
+GraphScene<Service, Call> scene = new GraphScene<Service, Call>() {
+    @Override protected NodeWidget attachNodeWidget(Service s) {
+        NodeWidget w = newNodeWidget().setLabel(s.getName()).setSecondaryLabel(s.getKind()).setLabelEditable(true)
+                .setAccent(s.isUp() ? "#2f8a4a" : "#b43b3b").setAttribute("kind", s.getKind());     // data-kind / --wb-g-kind for your CSS
+        if (s.isDatabase()) { w.setShape(Shape.CYLINDER).addPin("in").setSide(Side.TOP); }
+        else { w.setIcon(cube).addPin("http").setLabel("HTTP :8080"); }                           // AUTO pins: rows inside the node
+        return w;
+    }
+    @Override protected EdgeWidget attachEdgeWidget(Call c) {
+        return newEdgeWidget().setRouter(Router.ORTHOGONAL).setTargetShape(AnchorShape.TRIANGLE).setLabel(c.getProtocol());
+    }
+};
+scene.addNode(api).setLocation(470, 150);
+scene.addEdge(call); scene.setEdgeSource(call, web); scene.setEdgeTargetPin(call, db, "in");
+scene.addNote("note:1", "Fails over to the replica").setLocation(640, 420).attachTo(scene.findWidget(replica)).setTextEditable(true);
+scene.setConnectProvider(new ConnectProvider() {                     // drag from a node's handle or a pin
+    public boolean isSource(Widget s) { return s.getObject() instanceof Service; }
+    public boolean canConnect(Widget s, Widget t) { return EdgeWidget.nodeOf(s) != EdgeWidget.nodeOf(t); }
+    public void connect(Widget s, Widget t) { Call c = new Call(...); scene.addEdge(c).setSource(s).setTarget(t); }
+});
+scene.setPopupProvider(GraphScene.popupFromRegistry("Services/Actions"));   // context actions over Service / Call
+scene.addRenameListener(e -> e.accept());                           // F2 / double-click editing
+scene.addDeleteListener(e -> { for (Object o : e.getObjects()) remove(o); });
+scene.layout(new TreeGraphLayout().setOrientation(TreeGraphLayout.Orientation.LEFT_RIGHT), true);   // animated
+new GraphTopComponent(scene);                                        // toolbar + selection in the lookup
+```
+
+Widgets: `Widget` (`setVisible/Opacity/StyleName/Tooltip/Foreground/Background/Border/Attribute`), `NodeWidget` (`setLabel`, `setSecondaryLabel`, `setIcon`, `setIconPosition`, `setShape` — `RECTANGLE, ROUNDED, ELLIPSE, DIAMOND, HEXAGON, PARALLELOGRAM, CYLINDER, DOCUMENT, ICON, CUSTOM` + `setCustomSvg("<path d='M0,0 H{w} …'/>")`, `setLocation` (centre), `setPreferredSize` (else measured by the browser), `setMovable`, `setSelectable`, `setLabelEditable`, `setAccent`, `addPin(id)` → `PinWidget` (`setLabel`, `setIcon`, `setSide` — `AUTO` rows or `LEFT/RIGHT/TOP/BOTTOM` sockets)), `EdgeWidget` (`setSource/Target` (node or pin), `setRouter` — `DIRECT, ORTHOGONAL, CURVED, FREE` + `setControlPoints`, `setSourceAnchor/TargetAnchor` — `CENTER, BOUNDARY, CIRCULAR, LEFT, RIGHT, TOP, BOTTOM, SIDE`, `setSourceShape/TargetShape` — `NONE, ARROW, TRIANGLE[_HOLLOW], DIAMOND[_HOLLOW], CIRCLE[_HOLLOW], BAR`, `setLineStyle`, `setStrokeWidth`, `setCornerRadius`, `setLabel` / `addLabel(text, 0..1, above)`), `NoteWidget` (`setText`, `setLocation` (top-left), `setWidth`, `attachTo`, `setTextEditable`, `setFontSize`).
+
+Scene: `setSelectionMode(NONE, SINGLE, MULTI)`, `setGrid`, `setShowGrid`, `setRouter` (default for edges), `setAnimation`, `setMinimap`, `setDropTarget` (palette drops → `DROP`), `getSelectedObjects/Widgets`, `setSelectedObjects`, `getSelectionLookup`, `fitToView`, `zoomTo`, `centerOn`, `layout(GridGraphLayout | CircularGraphLayout | TreeGraphLayout | ForceGraphLayout, animated)`, `exportSvg/exportPng/download`. Events: `SELECT`, `MOVE` (applied), `CONNECT`, `ACTIVATE` (double-click), `HOVER`, `MENU`, `RENAME`, `DELETE` (nothing removed by itself), `DROP`. `GraphTopComponent` adds the toolbar (zoom, fit, arrange with `setGraphLayout`, save SVG/PNG, `Graph/Actions`). The simpler `Diagram` (§3b) remains for a quick picture without an object model.
+
+---
+
 ## 8. Scene3D
 
 ```java

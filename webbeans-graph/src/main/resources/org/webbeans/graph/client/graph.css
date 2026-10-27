@@ -1,0 +1,72 @@
+/* wb.GraphScene */
+.wb-graph { position: relative; flex: 1; min-width: 0; min-height: 200px; background: var(--wb-panel); overflow: hidden; outline: none; cursor: default; user-select: none; }
+.wb-graph:focus-visible { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--wb-accent) 40%, transparent); }
+.wb-graph.wb-graph-over { box-shadow: inset 0 0 0 2px var(--wb-accent); }
+.wb-graph-svg { position: absolute; inset: 0; width: 100%; height: 100%; font: 12px var(--wb-font); }
+.wb-graph-bg { fill: var(--wb-panel); }
+.wb-graph-griddot { fill: var(--wb-line); }
+.wb-graph-panning, .wb-graph-panning .wb-graph-svg { cursor: grabbing; }
+.wb-graph-dragging .wb-graph-svg { cursor: move; }
+.wb-graph-connecting .wb-graph-svg { cursor: crosshair; }
+
+/* nodes */
+.wb-graph-node { cursor: move; }
+.wb-graph-node.wb-graph-locked { cursor: default; }
+.wb-graph-shape { fill: var(--wb-chrome); stroke: var(--wb-fg-2); stroke-width: 1.2; }
+.wb-graph-shape-icon { fill: transparent; stroke: none; }
+.wb-graph-border-none { stroke: none; }
+.wb-graph-border-dashed { stroke-dasharray: 5 3; }
+.wb-graph-border-double { stroke-width: 1.2; paint-order: stroke; filter: drop-shadow(0 0 0 var(--wb-fg-2)); }
+.wb-graph-border-rounded { stroke-linejoin: round; }
+.wb-graph-border-shadow { filter: drop-shadow(2px 3px 3px rgba(0, 0, 0, .25)); }
+.wb-graph-node:hover > .wb-graph-shape { stroke: var(--wb-fg); }
+.wb-graph-node.wb-selected > .wb-graph-shape { stroke: var(--wb-accent); stroke-width: 2.5; }
+.wb-graph-node.wb-graph-target > .wb-graph-shape { stroke: var(--wb-ok); stroke-width: 3; }
+.wb-graph-accent { pointer-events: none; }
+.wb-graph-label { fill: var(--wb-fg); font-size: 13px; font-weight: 600; pointer-events: none; }
+.wb-graph-label2 { fill: var(--wb-fg-2); font-size: 11px; pointer-events: none; }
+.wb-graph-pinsep { stroke: var(--wb-line); stroke-width: 1; }
+.wb-graph-pinrow { fill: transparent; }
+.wb-graph-pin:hover .wb-graph-pinrow { fill: var(--wb-accent-soft); }
+.wb-graph-pindot { fill: var(--wb-panel); stroke: var(--wb-fg-2); stroke-width: 1.2; }
+.wb-graph-pin-source .wb-graph-pindot { cursor: crosshair; }
+.wb-graph-pin-source:hover .wb-graph-pindot { fill: var(--wb-accent); stroke: var(--wb-accent); }
+.wb-graph-pinlabel { fill: var(--wb-fg); font-size: 11.5px; pointer-events: none; }
+.wb-graph-connect-handle { fill: var(--wb-accent); stroke: var(--wb-panel); stroke-width: 1.5; cursor: crosshair; opacity: 0; transition: opacity .12s; }
+.wb-graph-node:hover .wb-graph-connect-handle, .wb-graph-node.wb-selected .wb-graph-connect-handle { opacity: 1; }
+.wb-graph-custom { fill: var(--wb-chrome); stroke: var(--wb-fg-2); stroke-width: 1.2; }
+
+/* edges */
+.wb-graph-edge { cursor: pointer; }
+.wb-graph-edge.wb-graph-unselectable { cursor: default; }
+.wb-graph-edge-hit { fill: none; stroke: transparent; stroke-width: 12; }
+.wb-graph-edge-line { fill: none; stroke: var(--wb-fg-2); stroke-linejoin: round; stroke-linecap: round; }
+.wb-graph-ls-dashed { stroke-dasharray: 6 4; }
+.wb-graph-ls-dotted { stroke-dasharray: 1.5 4; }
+.wb-graph-edge:hover .wb-graph-edge-line { stroke: var(--wb-fg); }
+.wb-graph-edge.wb-selected .wb-graph-edge-line { stroke: var(--wb-accent); }
+.wb-graph-edge.wb-selected .wb-graph-marker { fill: var(--wb-accent); stroke: var(--wb-accent); }
+.wb-graph-marker { fill: var(--wb-fg-2); stroke: var(--wb-fg-2); stroke-width: 1.2; stroke-linejoin: round; }
+.wb-graph-marker-hollow, .wb-graph-marker-open { fill: var(--wb-panel); }
+.wb-graph-marker-open { fill: none; stroke-linecap: round; }
+.wb-graph-edgelabel-bg { fill: var(--wb-panel); stroke: var(--wb-line); stroke-width: .8; }
+.wb-graph-edgelabel-text { fill: var(--wb-fg-2); font-size: 11px; pointer-events: none; }
+
+/* notes */
+.wb-graph-note { cursor: move; }
+.wb-graph-paper { fill: var(--wb-note, #fff6c2); stroke: var(--wb-note-line, #d8c76a); stroke-width: 1; }
+.wb-graph-fold { fill: var(--wb-note, #fff6c2); stroke: var(--wb-note-line, #d8c76a); stroke-width: 1; filter: brightness(.92); }
+.wb-graph-note.wb-selected .wb-graph-paper { stroke: var(--wb-accent); stroke-width: 2; }
+.wb-graph-notetext { fill: var(--wb-note-fg, #4a4322); pointer-events: none; }
+.wb-graph-notelink { fill: none; stroke: var(--wb-note-line, #d8c76a); stroke-width: 1.2; stroke-dasharray: 4 3; }
+:root[data-theme="dark"] .wb-graph { --wb-note: #4a4320; --wb-note-line: #8a7b35; --wb-note-fg: #efe6b4; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .wb-graph { --wb-note: #4a4320; --wb-note-line: #8a7b35; --wb-note-fg: #efe6b4; } }
+
+/* overlay, editor, minimap */
+.wb-graph-band { fill: color-mix(in srgb, var(--wb-accent) 15%, transparent); stroke: var(--wb-accent); stroke-width: 1; stroke-dasharray: 4 2; }
+.wb-graph-connectline { fill: none; stroke: var(--wb-accent); stroke-width: 1.5; stroke-dasharray: 5 3; pointer-events: none; }
+.wb-graph-editor { position: absolute; z-index: 3; font: 13px var(--wb-font); padding: 2px 6px; box-sizing: border-box; resize: none; }
+.wb-graph-minimap { position: absolute; right: 8px; bottom: 8px; width: 160px; height: 100px; background: var(--wb-panel); border: 1px solid var(--wb-line); border-radius: var(--wb-radius); box-shadow: var(--wb-shadow); cursor: pointer; z-index: 2; }
+.wb-graph-minisvg { width: 160px; height: 100px; display: block; }
+.wb-graph-mininode { fill: var(--wb-fg-2); opacity: .5; }
+.wb-graph-miniview { fill: color-mix(in srgb, var(--wb-accent) 12%, transparent); stroke: var(--wb-accent); stroke-width: 1; vector-effect: non-scaling-stroke; }

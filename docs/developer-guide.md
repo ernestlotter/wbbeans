@@ -262,7 +262,7 @@ An `Action` (`org.webbeans.actions`) has a display name, icon, enabled flag, a v
 | Checkbox menu item backed by a user preference | `Actions.checkbox(Module.class, "key", default, onToggle, label)` from a `Presenter.Menu` action (see the Workbench's `SpinAction`) |
 | Full control (own presenter, own enablement) | a public `Action` subclass with a no-arg constructor; implement `Presenter.Menu/Toolbar/Popup` to supply components |
 | Background work | `@ActionRegistration(…, asynchronous = true)`: runs on a `RequestProcessor` with a "Running …" progress handle; use `e.getUI().access(…)` for components |
-| Menu / toolbar / popup placement | `@ActionReference(path = "Menu/File", position = …, separatorBefore/After = …)`, `"Toolbars/File"`, `"<Type>/Actions"` (any folder a node reads with `Actions.forPath`), `Scene3DTopComponent.ACTIONS_FOLDER`, `ChartTopComponent.ACTIONS_FOLDER` |
+| Menu / toolbar / popup placement | `@ActionReference(path = "Menu/File", position = …, separatorBefore/After = …)`, `"Toolbars/File"`, `"<Type>/Actions"` (any folder a node reads with `Actions.forPath`), `Scene3DTopComponent.ACTIONS_FOLDER`, `ChartTopComponent.ACTIONS_FOLDER`, `GraphTopComponent.ACTIONS_FOLDER` |
 | Keyboard shortcut | `@ActionReference(path = "Shortcuts", name = "D-S")` (`D` = Ctrl/Cmd, `O` = Alt, `S` = Shift, keys `S`, `F5`, `ENTER`, `DELETE`, `UP`…) |
 | A menu or toolbar of your own | `@FolderRegistration(path = "Toolbars/File", displayName = "#CTL_FileToolbar", position = 100)` on any class |
 | Keep the last selection when a window without one is activated | `surviveFocusChange = true` (the Workbench's Save stays enabled while you look at the Files window) |
@@ -404,6 +404,12 @@ scene.addListener(Scene3D.PICK, e -> { scene.setSelection(e.getNode()); status(e
 
 ---
 
+## 12a. Graph scenes
+
+`GraphScene<N, E>` (`org.webbeans.graph`) is the Visual Library idea: your objects are mapped to widgets, and the widgets say how they look — shape, pins, accent, icon, anchors, router, end shapes, labels — per object, in `attachNodeWidget`/`attachEdgeWidget` overrides or on the widget `addNode`/`addEdge` returns. Notes are free text attached to any widget. Sizes are measured by the browser, so server-side layouts (`TreeGraphLayout`, `GridGraphLayout`, `CircularGraphLayout`, `ForceGraphLayout`) place nodes exactly, animated. The user selects, drags, connects (a `ConnectProvider` decides and creates), renames in place, right-clicks (a `PopupProvider`, or `GraphScene.popupFromRegistry("MyType/Actions")` for registered context actions) and presses Delete; every change is a small delta merged per flush. `GraphTopComponent` wraps a scene with a toolbar and puts the selection (objects and widgets) in the window's lookup, so the Properties window and context actions follow it. The component guide §7a has the full API; the demo's *Deployment graph* window (`DeploymentTopComponent`) uses most of it.
+
+---
+
 ## 13. Writing your own component
 
 When a built-in component does not fit, write one: a Java class and a JavaScript renderer.
@@ -472,7 +478,7 @@ Everything that touches components runs through `h.run(...)` (the session execut
 - Lower-level: a `UI` with a recording `Transport` (`UITest`, `ExplorerTest`, `ChartTest`, `Scene3DTest`); window system tests with a `Registry` built from a `RegistrationBuilder` (`WindowManagerTest`); dialogs answered by clicking their buttons (`DialogsTest`); the help system end to end on `HeadlessUI` (`HelpTest`: registry → table of contents, display, F1, dialog buttons, search, the stand-alone page, re-expansion after a restore).
 - `MockServices.setServices(FakeFileService.class)` swaps services in `Lookup.getDefault()` for a test; `WbDefaultLookup.getInstance().setContent(...)` replaces the whole default lookup (HeadlessUI restores it on close).
 - Registry and platform tests can build real jars at test time (`TestJars` in `webbeans-core`'s tests), put them in a `URLClassLoader` and run `Platform.start` against it and a temp data directory.
-- Server tests: `WbServerTest` starts the real Jetty server on port 0 and speaks the protocol over long polling (`HttpURLConnection`) and over a WebSocket (Jetty's `WebSocketClient`); `webbeans-demo/e2e/*.js` (`transport.js` covers the WebSocket, the outage/replay path and the long-poll fallback), `webbeans-tutorial/e2e/tutorial.js`, `workbench/e2e/workbench.js` and `workbench/e2e/help.js` drive Chromium with Playwright (headless WebGL through SwiftShader) through the dock, the explorer, the menus, dialogs, charts, 3D, options, help, persistence, reconnect and roles.
+- Server tests: `WbServerTest` starts the real Jetty server on port 0 and speaks the protocol over long polling (`HttpURLConnection`) and over a WebSocket (Jetty's `WebSocketClient`); `webbeans-demo/e2e/*.js` (`transport.js` covers the WebSocket, the outage/replay path and the long-poll fallback; `graph.js` the graph scene), `webbeans-tutorial/e2e/tutorial.js`, `workbench/e2e/workbench.js` and `workbench/e2e/help.js` drive Chromium with Playwright (headless WebGL through SwiftShader) through the dock, the explorer, the menus, dialogs, charts, 3D, options, help, persistence, reconnect and roles.
 
 ---
 

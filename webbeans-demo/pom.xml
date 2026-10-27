@@ -40,6 +40,10 @@
     </dependency>
     <dependency>
       <groupId>org.webbeans</groupId>
+      <artifactId>webbeans-graph</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.webbeans</groupId>
       <artifactId>webbeans-scene3d</artifactId>
     </dependency>
     <dependency>
