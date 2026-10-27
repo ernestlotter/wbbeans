@@ -1,0 +1,37 @@
+@page { size: A4; margin: 18mm 16mm 20mm 16mm; }
+html { font-size: 10.5pt; }
+body { font-family: "DejaVu Sans", "Liberation Sans", Arial, sans-serif; line-height: 1.45; color: #1d1d1f; max-width: none; margin: 0; }
+h1 { font-size: 24pt; margin: 0 0 6pt; color: #0b5a66; }
+h1.title { border-bottom: 2px solid #0b5a66; padding-bottom: 8pt; }
+h2 { font-size: 16pt; color: #0b5a66; margin: 22pt 0 8pt; page-break-before: always; border-bottom: 1px solid #c9d6d9; padding-bottom: 4pt; }
+h2:first-of-type { page-break-before: avoid; }
+h3 { font-size: 12.5pt; color: #144; margin: 16pt 0 6pt; page-break-after: avoid; }
+h2, h3 { page-break-after: avoid; }
+p { margin: 5pt 0 7pt; orphans: 3; widows: 3; }
+code { font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; font-size: 8.6pt; background: #f1f4f5; padding: 0 2px; border-radius: 2px; }
+pre { background: #f6f8f8; border: 1px solid #dfe6e8; border-left: 3px solid #0b5a66; padding: 7pt 9pt; font-size: 8.2pt; line-height: 1.35; white-space: pre-wrap; word-wrap: break-word; page-break-inside: avoid; margin: 6pt 0 9pt; }
+pre code { background: none; padding: 0; font-size: inherit; }
+img { max-width: 100%; height: auto; display: block; margin: 8pt auto 2pt; border: 1px solid #c9d0d3; page-break-inside: avoid; }
+p > img + em, img + p em, .caption { font-size: 9pt; color: #4a5559; }
+p:has(> img) + p { font-size: 9pt; color: #4a5559; margin-top: 2pt; page-break-before: avoid; }
+p:has(> img) { page-break-inside: avoid; page-break-after: avoid; }
+table { border-collapse: collapse; width: 100%; margin: 8pt 0; font-size: 9pt; page-break-inside: avoid; }
+th, td { border: 1px solid #d5dde0; padding: 3pt 6pt; text-align: left; vertical-align: top; }
+th { background: #eef3f4; }
+blockquote { border-left: 3px solid #c9d6d9; margin: 6pt 0; padding: 2pt 10pt; color: #3c4a4e; }
+hr { display: none; }
+ul, ol { margin: 4pt 0 8pt; padding-left: 20pt; }
+li { margin: 2pt 0; }
+a { color: #0b5a66; text-decoration: none; }
+#TOC { page-break-after: always; }
+#TOC > ul { list-style: none; padding-left: 0; }
+#TOC ul ul { list-style: none; padding-left: 14pt; }
+#TOC li { margin: 1pt 0; }
+#TOC > ul > li { margin-top: 4pt; font-weight: 600; }
+#TOC > ul > li > ul { font-weight: 400; }
+#TOC::before { content: "Contents"; display: block; font-size: 16pt; color: #0b5a66; margin-bottom: 8pt; font-weight: 600; }
+/* pygments-ish via pandoc classes */
+code span.kw { color: #7c3aed; font-weight: 600; } code span.dt { color: #0b5a66; } code span.st { color: #b45309; } code span.co { color: #6b7280; font-style: italic; } code span.at { color: #0369a1; } code span.fu { color: #1d4ed8; } code span.dv, code span.fl { color: #047857; } code span.an { color: #0369a1; }
+pre > code.sourceCode > span { display: block; white-space: pre-wrap; text-indent: 0; padding-left: 0; min-height: 1.35em; }
+pre > code.sourceCode > span > a { display: none; }
+pre > code.sourceCode { white-space: normal; }
