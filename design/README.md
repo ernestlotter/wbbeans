@@ -14,6 +14,7 @@
 | `design/charts.md` | Step 6: Chart component, model, wire format, SVG renderer, export | v0.2 |
 | `design/graph.md` | Step 16: GraphScene (Visual Library model), widgets, anchors/routers, notes, layouts, renderer, wire format | v0.1 |
 | `design/map.md` | Step 17: MapView, tile sources and the tile endpoint, overlays, events, renderer, wire format | v0.1 |
+| `design/authentication.md` | Step 2 (revised in step 18): providers, credentials, login page, roles, session policy, `SessionStore` and load balancing / multi-instance deployment | v0.2 |
 | `design/scene3d.md` | Step 7: Scene3D, scene graph, blobs, glTF, interaction, binders, explorer bridge (as built) | v0.3 |
 | `design/sample-app.md` | Step 8: the "Workbench" sample application — five modules, options, roles/layouts, application jar, headless test API (as built) | v0.2 |
 

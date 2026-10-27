@@ -16,6 +16,8 @@ public final class ServerConfig {
     private String applicationTitle = "WebBeans";
     private boolean devMode;
     private boolean secureCookies;
+    private org.webbeans.auth.spi.SessionStore sessionStore;
+    private String nodeId = defaultNodeId();
     private Duration sessionIdleTimeout = Duration.ofMinutes(30);
     private Duration sessionMaxLifetime = Duration.ofHours(12);
     private Duration uiGracePeriod = Duration.ofMinutes(2);
@@ -118,6 +120,38 @@ public final class ServerConfig {
     public ServerConfig secureCookies(boolean b) {
         this.secureCookies = b;
         return this;
+    }
+
+    /**
+     * A shared store of authenticated sessions, so another instance (or this one after a restart) accepts the
+     * browser's cookie and the user keeps their login; null (the default) also looks for one in the Lookup.
+     * See {@code FileSessionStore} and the load-balancing section of {@code design/authentication.md}.
+     */
+    public ServerConfig sessionStore(org.webbeans.auth.spi.SessionStore store) {
+        sessionStore = store;
+        return this;
+    }
+
+    public org.webbeans.auth.spi.SessionStore getSessionStore() {
+        return sessionStore;
+    }
+
+    /** This instance's name in logs, session files and {@code /wb/health}; default: the host name. */
+    public ServerConfig nodeId(String id) {
+        nodeId = id == null || id.trim().isEmpty() ? defaultNodeId() : id.trim();
+        return this;
+    }
+
+    public String getNodeId() {
+        return nodeId;
+    }
+
+    private static String defaultNodeId() {
+        try {
+            return java.net.InetAddress.getLocalHost().getHostName();
+        } catch (java.io.IOException e) {
+            return "node";
+        }
     }
 
     public Duration getSessionIdleTimeout() {

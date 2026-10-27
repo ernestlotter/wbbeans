@@ -352,6 +352,11 @@ public final class AuthHandler extends HttpServlet {
     // ---- session endpoints ------------------------------------------------------------------------------------
 
     /** The valid session of the request's cookie, or null. */
+    /** The session table (for the health endpoint and admin views). */
+    public SessionManager getSessionManager() {
+        return sessions;
+    }
+
     public HttpSession currentSession(WbRequest r) {
         return sessions.get(r.getCookie(SESSION_COOKIE));
     }

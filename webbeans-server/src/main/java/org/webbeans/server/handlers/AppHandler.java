@@ -103,6 +103,11 @@ public final class AppHandler extends HttpServlet {
             blob(r, path.substring("/wb/blob/".length()));
         } else if (path.startsWith("/wb/download/")) {
             download(r, path.substring("/wb/download/".length()));
+        } else if (path.equals("/wb/health")) {
+            // for load balancers: no session needed, nothing sensitive
+            r.setHeader("Cache-Control", "no-store");
+            r.sendJson(200, "{\"status\":\"ok\",\"node\":" + org.webbeans.core.json.Json.write(config.getNodeId())
+                    + ",\"sessions\":" + auth.getSessionManager().size() + "}");
         } else if (path.equals("/favicon.ico")) {
             r.sendEmpty(204);
         } else {

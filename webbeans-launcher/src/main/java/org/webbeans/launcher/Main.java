@@ -21,7 +21,7 @@ import org.webbeans.server.WbServer;
  *
  * <pre>
  * java -cp 'lib/*' org.webbeans.launcher.Main [--port 8080] [--host 0.0.0.0] [--datadir data]
- *      [--context /app] [--title "My App"] [--locale de] [--session-timeout 30m] [--dev] [--admin-password x]
+ *      [--context /app] [--title "My App"] [--locale de] [--session-timeout 30m] [--session-store DIR] [--node-id NAME] [--dev] [--admin-password x]
  *      [--no-websocket] [--http-threads 32] [--max-upload 256m]
  *      [--https-port 8443 [--keystore server.p12 --keystore-password x [--key-password y] [--keystore-type PKCS12]]
  *       [--https-redirect] [--no-http] [--no-hsts]]
@@ -80,6 +80,12 @@ public final class Main {
             } else if (a.equals("--session-timeout")) {
                 config.sessionIdleTimeout(parseDuration(require(a, v)));
                 i++;
+            } else if (a.equals("--session-store")) {
+                config.sessionStore(new org.webbeans.server.FileSessionStore(java.nio.file.Paths.get(require(a, v))));
+                i++;
+            } else if (a.equals("--node-id")) {
+                config.nodeId(require(a, v));
+                i++;
             } else if (a.equals("--admin-password")) {
                 adminPassword = require(a, v);
                 i++;
@@ -126,7 +132,7 @@ public final class Main {
                 config.hsts(false);
             } else if (a.equals("--help") || a.equals("-h")) {
                 System.out.println("Options: --port N --host H --datadir DIR --context /path --title T --locale xx"
-                        + " --session-timeout 30m --admin-password PW --no-default-admin --branding NAME --dev --secure-cookies --trusted-proxy IP"
+                        + " --session-timeout 30m --session-store DIR --node-id NAME --admin-password PW --no-default-admin --branding NAME --dev --secure-cookies --trusted-proxy IP"
                         + " --no-websocket --http-threads N --max-upload 256m"
                         + " --https-port N --keystore FILE --keystore-password PW --key-password PW --keystore-type PKCS12|JKS"
                         + " --https-redirect --no-http --no-hsts");

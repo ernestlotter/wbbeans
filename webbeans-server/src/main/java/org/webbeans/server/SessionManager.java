@@ -26,6 +26,7 @@ import org.webbeans.auth.Authenticator;
 import org.webbeans.auth.Principal;
 import org.webbeans.auth.SimpleAuthContext;
 import org.webbeans.auth.spi.SessionPolicy;
+import org.webbeans.auth.spi.SessionStore;
 import org.webbeans.core.files.DataDir;
 import org.webbeans.core.files.UserFiles;
 import org.webbeans.ui.UI;
@@ -45,6 +46,8 @@ public final class SessionManager {
     private final Map<String, HttpSession> sessions = new ConcurrentHashMap<String, HttpSession>();
     private final ExecutorService backend;
     private final ScheduledExecutorService sweeper;
+    /** Last activity stamp written to the store per session, to touch it only when something happened. */
+    private final Map<String, Instant> stored = new ConcurrentHashMap<String, Instant>();
 
     public SessionManager(ServerConfig config) {
         ServerSessionDirectory.register(this);
@@ -103,23 +106,96 @@ public final class SessionManager {
         HttpSession s = new HttpSession(randomToken(), randomToken(), ui, remoteAddress);
         sessions.put(s.getId(), s);
         LOG.log(Level.INFO, "Session {0} created for {1} from {2}", new Object[] {s.getId().substring(0, 6), p.getName(), remoteAddress});
+        SessionStore store = store();
+        if (store != null) {
+            try {
+                store.put(toStored(s, policy));
+                stored.put(s.getId(), s.getLastActivity());
+            } catch (IOException e) {
+                LOG.log(Level.WARNING, "Session store put failed: " + e);
+            }
+        }
         return s;
     }
 
-    /** The valid session with that id, or null. Does not touch it. */
+    /** The valid session with that id — adopting it from the {@link SessionStore} if another instance created it — or null. */
     public HttpSession get(String id) {
         if (id == null) {
             return null;
         }
         HttpSession s = sessions.get(id);
         if (s == null) {
-            return null;
+            s = adopt(id);
+            if (s == null) {
+                return null;
+            }
         }
         if (!s.isValid() || s.getAuthentication().isExpired()) {
             invalidate(s, AuthenticationEvent.LogoutReason.MAX_LIFETIME);
             return null;
         }
         return s;
+    }
+
+    /** A session another instance (or this one before a restart) created: same id and CSRF token, a fresh UI session. */
+    private HttpSession adopt(String id) {
+        SessionStore store = store();
+        if (store == null || id.length() < 8 || !id.matches("[A-Za-z0-9_-]+")) {
+            return null;
+        }
+        SessionStore.StoredSession st;
+        try {
+            st = store.get(id);
+        } catch (IOException e) {
+            LOG.log(Level.WARNING, "Session store get failed: " + e);
+            return null;
+        }
+        if (st == null || st.isExpired() || st.getAuthentication().isExpired()) {
+            return null;
+        }
+        synchronized (this) {
+            HttpSession existing = sessions.get(id);
+            if (existing != null) {
+                return existing;
+            }
+            Principal p = st.getAuthentication().getPrincipal();
+            UserFiles files = null;
+            DataDir dd = Lookup.getDefault().lookup(DataDir.class);
+            if (dd != null) {
+                try {
+                    files = dd.userFiles(p.getName());
+                } catch (IOException e) {
+                    LOG.log(Level.WARNING, "Cannot open the user files of " + p.getName() + ": " + e);
+                }
+            }
+            UISession ui = new UISession(st.getAuthentication(), st.getLocale() != null ? st.getLocale() : Locale.getDefault(), files, backend);
+            ui.setAttribute(org.webbeans.ui.SessionDirectory.REMOTE_ADDRESS, st.getRemoteAddress());
+            HttpSession s = new HttpSession(st.getId(), st.getCsrfToken(), ui, st.getRemoteAddress());
+            sessions.put(id, s);
+            stored.put(id, s.getLastActivity());
+            LOG.log(Level.INFO, "Session {0} of {1} adopted from the session store (created on {2})",
+                    new Object[] {id.substring(0, 6), p.getName(), st.getNodeId()});
+            return s;
+        }
+    }
+
+    private SessionStore store() {
+        SessionStore s = config.getSessionStore();
+        return s != null ? s : Lookup.getDefault().lookup(SessionStore.class);
+    }
+
+    private SessionStore.StoredSession toStored(HttpSession s, SessionPolicy policy) {
+        return new SessionStore.StoredSession(s.getId(), s.getCsrfToken(), s.getAuthentication(), s.getLocale(), s.getRemoteAddress(),
+                config.getNodeId(), s.getCreated(), s.getLastActivity(), expiry(s, policy));
+    }
+
+    private Instant expiry(HttpSession s, SessionPolicy policy) {
+        Principal p = s.getPrincipal();
+        Instant idle = s.getLastActivity().plus(idleTimeout(p, policy));
+        Instant max = s.getCreated().plus(maxLifetime(p, policy));
+        Instant e = idle.isBefore(max) ? idle : max;
+        Instant auth = s.getAuthentication().getExpiresAt();
+        return auth != null && auth.isBefore(e) ? auth : e;
     }
 
     public int size() {
@@ -136,6 +212,15 @@ public final class SessionManager {
             return;
         }
         s.markInvalid();
+        stored.remove(s.getId());
+        SessionStore store = store();
+        if (store != null && reason != AuthenticationEvent.LogoutReason.SHUTDOWN) {   // a stopping node leaves its sessions for the others
+            try {
+                store.remove(s.getId());
+            } catch (IOException e) {
+                LOG.log(Level.WARNING, "Session store remove failed: " + e);
+            }
+        }
         Authenticator auth = Authenticator.getDefault();
         if (auth != null) {
             try {
@@ -194,6 +279,26 @@ public final class SessionManager {
                 s.setLastRevalidated(now);
             }
             sweepUIs(s, now);
+            touchStore(s, policy);
+        }
+    }
+
+    /** Pushes the activity stamp to the store when it moved since the last push (every sweep, so ≤ one write per 10 s per session). */
+    private void touchStore(HttpSession s, SessionPolicy policy) {
+        SessionStore store = store();
+        if (store == null) {
+            return;
+        }
+        Instant last = stored.get(s.getId());
+        Instant now = s.getLastActivity();
+        if (last != null && !now.isAfter(last)) {
+            return;
+        }
+        try {
+            store.touch(s.getId(), now, expiry(s, policy));
+            stored.put(s.getId(), now);
+        } catch (IOException e) {
+            LOG.log(Level.WARNING, "Session store touch failed: " + e);
         }
     }
 

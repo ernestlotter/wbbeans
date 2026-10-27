@@ -1,4 +1,6 @@
-# WebBeans — Pluggable Authentication (API design v0.1)
+# WebBeans — Pluggable Authentication (API design v0.2)
+
+**v0.2** (step 18): §8a `SessionStore` — sessions shared between instances — and §14 load balancing and multi-instance deployment.
 
 Scope: how a user becomes a `Principal` in a `UISession`, how applications plug in their own identity systems (Firebase, an existing SSO, a home-grown user table, a reverse proxy, LDAP, OAuth2/OIDC), and how the login page, session policy and authorization hook into that. Package `org.webbeans.auth` in a new module `webbeans-auth` (API + shipped providers); the server (step 2) depends on it. JDK 8, no third-party dependencies in the API or the shipped providers (JWT verification uses `java.security`).
 
@@ -199,6 +201,51 @@ public interface UserDirectory {                                            // o
 }
 ```
 
+## 8a. Session store (sharing sessions between instances)
+
+A session lives in the memory of the instance that created it: the `SessionManager` table, keyed by the
+`WBSESSION` cookie, holds the `HttpSession` with its CSRF token, `Authentication` and `UISession`. A second
+instance — or the same one after a restart — does not know the cookie and shows the login page. The optional
+**`SessionStore`** SPI (`org.webbeans.auth.spi`) makes the *authenticated* part of a session durable and shared:
+
+```java
+public interface SessionStore {
+    void put(StoredSession s) throws IOException;                        // on login
+    StoredSession get(String sessionId) throws IOException;               // null = unknown or expired
+    void touch(String id, Instant lastActivity, Instant expiresAt) throws IOException;   // ≤ 1 write / 10 s / session
+    void remove(String sessionId) throws IOException;                     // logout, timeout, admin — not on shutdown
+    Collection<StoredSession> list() throws IOException;                  // admin views, concurrent-session policy
+}
+// StoredSession: id, CSRF token, Authentication (principal, methods, expiry, secrets), locale, remote address,
+// node id, created / lastActivity / expiresAt; toJson() / fromJson(Map)
+```
+
+Semantics in the `SessionManager`:
+
+- `create` (login) → `put`. The stored `expiresAt` is the earliest of idle timeout, maximum lifetime and the
+  authentication's own expiry, computed from the `SessionPolicy`; the sweeper `touch`es it when the session
+  was active since the last write.
+- `get(cookie)` with no session in memory → `store.get`: if present and unexpired the instance **adopts** it —
+  an `HttpSession` with the *same id and CSRF token* and a fresh `UISession` for the stored `Authentication`
+  — and logs `adopted from the session store (created on <node>)`. The next `GET /` builds a new UI; the
+  user is signed in but starts with the default window layout for that tab (per-user layout files are on the
+  data dir, so they come back when the data dir is shared).
+- `invalidate` → `remove`, except for `SHUTDOWN`: a stopping node leaves its sessions for the others, which is
+  what makes rolling restarts invisible to users.
+- Store failures are logged and ignored: the instance keeps working from memory; the degradation is "re-login
+  after failover", never "cannot sign in".
+- `Authentication.getSecrets()` *is* stored (an OIDC refresh token must survive the failover to be useful), so
+  the store must be as private as the server's memory: a directory readable by the server user only, or an
+  authenticated database/Redis.
+
+The shipped example is **`FileSessionStore`** (`webbeans-server`): one JSON file per session in a directory
+every instance mounts (NFS, SMB, a shared volume), atomic writes, tolerant reads, expired files pruned once a
+minute. Enable it with `--session-store /shared/wb/sessions` (and `--node-id app-1`, default the host name)
+or `new ServerConfig().sessionStore(new FileSessionStore(dir))`, or register any implementation with
+`@ServiceProvider(service = SessionStore.class)`. A JDBC or Redis store is the same five methods with another
+back end; `StoredSession.toJson()`/`fromJson()` give it the serialisation. `SessionStoreTest` runs two
+`SessionManager`s over one store.
+
 ## 9. HTTP surface (fixed, provider-independent)
 
 | Endpoint | Purpose |
@@ -210,6 +257,7 @@ public interface UserDirectory {                                            // o
 | `POST /auth/challenge` | `ChallengeResponse` for multi-step logins |
 | `POST /logout` | Ends the session, calls `provider.logout`, redirects to `/login` or the provider's end-session URL |
 | `GET /auth/me` | JSON of the current principal (for custom front-ends) |
+| `GET /wb/health` | `{"status":"ok","node":…,"sessions":n}` without a session — for load-balancer health checks (server module) |
 
 Anything beyond this (device login, magic links) registers an `AuthHttpHandler` under `/auth/<id>/...`:
 
@@ -281,3 +329,101 @@ public final class AcmeUsersProvider implements AuthenticationProvider {
 
 - Step 2 (now): `webbeans-auth` API, `Authenticator` implementation, `PropertiesAuthenticationProvider`, `HeaderAuthenticationProvider`, default `LoginPage` (form + redirect buttons + script methods), `SessionPolicy` defaults, listeners, throttle, the HTTP endpoints in the server.
 - Step 2b (with Jetty): `JwtAuthenticationProvider` (JWKS fetch needs outbound HTTP), `FirebaseAuthenticationProvider`, `OidcAuthenticationProvider`, `LdapAuthenticationProvider`, each as its own module so applications ship only what they use.
+
+## 14. Load balancing and multi-instance deployment
+
+**The constraint.** A WebBeans session is stateful by design: the component tree, window layout, open editors
+and the registry views of each signed-in user live in the JVM they signed in on, and a tab talks to that JVM
+over one WebSocket (or long-poll channel). This is the same shape as the NetBeans Platform it mirrors, or any
+server-side-UI framework (Vaadin, ZK): the session *is* the application. Consequently instances can run on
+different machines and users can be spread across them, but the balancing must be **sticky per session**, not
+per request, and the UI state of a session does not move between instances.
+
+**What works out of the box.**
+
+- *Sticky reverse proxy.* nginx, HAProxy, Traefik, an AWS ALB: stickiness on the `WBSESSION` cookie (or the
+  balancer's own cookie), WebSocket upgrade forwarding, `X-Forwarded-For` / `X-Forwarded-Proto` set, and each
+  instance started with `--trusted-proxy <lb-ip>` so client addresses, HTTPS detection and secure cookies are
+  right. Every request of a tab — bootstrap page, `/wb/ws`, `/wb/poll`, uploads, `/wb/blob`, `/wb/tiles`,
+  `/wb/download` — carries the cookie, so one user's traffic lands on one instance. `balance leastconn` suits
+  long-lived WebSocket connections better than round-robin.
+- *Independent instances.* Each has its own Jetty, session table, executor pool and bundle; nothing is shared
+  in memory, so throughput scales linearly and a failure is isolated. `GET /wb/health` answers without a
+  session for the balancer's checks (`node` says which instance answered).
+- *Shared per-user state on disk.* `<datadir>/users/<u>/` (layouts, preferences, module files) and the
+  `PropertiesAuthenticationProvider` user file should be on a shared data dir (NFS/SMB) or synced, so a user who
+  lands on a different instance next week finds their layout and the accounts are not per instance; an
+  external identity provider (LDAP, OIDC, headers from the proxy) makes the account question disappear. Tile
+  caches and upload temp files can stay local.
+- *Login survives failover* with a `SessionStore` (§8a): when an instance goes away, the next request of its
+  users hits another instance, which adopts the session from the store and builds a fresh UI — no login page.
+  Without a store, users of a failed instance re-authenticate; their UI state is gone in both cases.
+
+**What stays per instance, and the consequences.**
+
+1. *UI state.* Open windows and editors of a session exist only in the JVM that built them. Failover gives the
+   user a signed-in but freshly laid-out tab (the saved layout is restored from the shared data dir). Rolling
+   restarts therefore cost users their unsaved editor contents; drain an instance (stop sending it new
+   sessions, wait for `sessions` in `/wb/health` to fall) before stopping it when that matters.
+2. *Cross-instance events.* `UISession.publish`, the session bus, `ServerSessionDirectory`, the admin
+   "sessions" view and the concurrent-sessions policy see the local instance only. Anything users must see from
+   each other — a shared model being edited, server-wide notifications, "kick this user everywhere" — goes
+   through the application's own backend (database, message broker) and is applied on each instance's
+   executor; `SessionStore.list()` gives admin views the global session list.
+3. *Capacity is memory, not CPU.* A session costs roughly its open component tree (tens of KB to a few MB with
+   large tables, graphs or scenes) plus the delta history kept for reconnects; size instances by concurrent
+   sessions and set `--session-timeout` so abandoned tabs are reclaimed. One backend pool (`ServerConfig.backendThreads`)
+   serves every session's tasks on an instance.
+
+**Recommended shape.**
+
+```
+                 ┌─ app-1  java -jar app.jar --datadir /shared/wb --session-store /shared/wb/sessions --node-id app-1 --trusted-proxy 10.0.0.5 --port 8080
+users ─► HAProxy ┼─ app-2  (same, --node-id app-2)
+   TLS, sticky,  └─ app-3  (same, --node-id app-3)
+   WS upgrade
+                 /shared/wb   users/, system/ (accounts), sessions/ on NFS or a shared volume; auth via LDAP/OIDC or the proxy
+```
+
+HAProxy:
+
+```
+frontend https
+    bind :443 ssl crt /etc/haproxy/app.pem
+    http-request set-header X-Forwarded-Proto https
+    default_backend webbeans
+
+backend webbeans
+    balance leastconn
+    cookie WBSTICKY insert indirect nocache httponly secure
+    option forwardfor
+    option httpchk GET /wb/health
+    server app1 10.0.1.11:8080 check cookie app1
+    server app2 10.0.1.12:8080 check cookie app2
+    server app3 10.0.1.13:8080 check cookie app3
+```
+
+nginx (`ip_hash` is the stickiness available without the commercial `sticky` module; a hash of the
+`WBSESSION` cookie with `hash $cookie_WBSESSION consistent` is the better choice when cookies are present):
+
+```
+upstream webbeans { hash $cookie_WBSESSION consistent; server 10.0.1.11:8080; server 10.0.1.12:8080; server 10.0.1.13:8080; }
+server {
+    listen 443 ssl; # certificates …
+    location / {
+        proxy_pass http://webbeans;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade";
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; proxy_set_header X-Forwarded-Proto https;
+        proxy_read_timeout 1h;   # idle WebSockets
+    }
+}
+```
+
+**Alternatives, briefly.** *Vertical first*: one instance serves hundreds of concurrent sessions on a modest
+machine, so a single bigger JVM behind TLS is often the simplest answer. *Per-tenant instances*: route by
+host name or path prefix (`--context /tenant-a`) rather than by load, which also keeps tenants' data dirs
+apart. *Active–passive*: one instance plus a standby with the shared data dir and session store — users
+re-attach after a failover without logging in. Kubernetes: a `Deployment` with session affinity (`sessionAffinity: ClientIP`
+on the Service, or cookie affinity on the ingress), a `ReadWriteMany` volume for the data dir and session
+store, `/wb/health` as readiness and liveness probe, `terminationGracePeriodSeconds` long enough to drain.
