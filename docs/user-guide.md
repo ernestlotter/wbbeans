@@ -4,6 +4,8 @@
 
 Companion documents: the **Developer Guide** (`docs/developer-guide.md`) explains the concepts in depth; the **Component Guide** (`docs/component-guide.md`) is the per-component reference. This guide is the path through them.
 
+*The screenshots in this guide were taken from the demo application (`webbeans-demo` + `webbeans-tutorial`, started as in §0) at 1280×800 in a stock browser theme; the Workbench looks the same with different windows. They are in `docs/images/`.*
+
 ---
 
 ## 0. Before you start
@@ -27,6 +29,14 @@ cd build/workbench-dist && ./workbench.sh            # http://localhost:8080, al
 ```
 
 The demo's first start prints a generated `admin` password (or pass `--admin-password …`). Log in and you will see the main window: menu bar, toolbars, the dock with the open windows, the status bar. Everything you see was produced by annotations in the jars on the class path.
+
+![The login page](images/login.png)
+
+*The login page — the platform's default `LoginPage`; register your own implementation of `org.webbeans.auth.spi.LoginPage` for a branded one (see `design/authentication.md`).*
+
+![The demo's main window after login](images/main-window.png)
+
+*The demo's main window. Left: the* explorer *mode with the Planets and Tasks windows; centre: the* editor *mode with the Dashboard, Hello, Form and About tabs; right: the* properties *mode; bottom: the* output *mode with the Events window. Menu bar and toolbars above, the status bar with the signed-in user, the clock, the language switch and the connection indicator below.*
 
 **Anatomy of an application jar.** Nothing special: an ordinary jar whose classes carry the WebBeans annotations. The annotation processor turns them into `META-INF/services` entries at compile time, and the platform reads those from every jar on the class path at start-up — there is no manifest, no descriptor and no module system.
 
@@ -95,6 +105,10 @@ What each line buys you:
 
 Build, restart, log in: the window is there, with a *Window ▸ Hello* entry. Type a name, press Enter (the default button) and the label updates — one event up, one delta down.
 
+![The Hello window after pressing Greet](images/tutorial-hello.png)
+
+*`HelloTopComponent` in the editor mode: a vertical flow of a text field, a primary button and a label — the whole constructor above, rendered.*
+
 **Pattern — read values when you need them, not on every keystroke.** `name.getValue()` is up to date because the text field's value is *client-owned*: the browser reports it on commit (blur/Enter) and the server keeps a copy. The server never pushes the value back while the user types, so there are no cursor jumps.
 
 ---
@@ -102,6 +116,10 @@ Build, restart, log in: the window is there, with a *Window ▸ Hello* entry. Ty
 ## 2. Components, values and events
 
 The tutorial's `ContactTopComponent` uses most of the input components at once (open it with *Window ▸ New contact*):
+
+![The New contact window](images/tutorial-contact.png)
+
+*`ContactTopComponent`: a `Form` with captions, the "First and last name" help text under the first field, a `ComboBox`, a `TextArea`, a `CheckBox` and the button row. Save is disabled until the form validates.*
 
 ```java
 private final TextField name = new TextField();
@@ -466,6 +484,10 @@ DialogDisplayer.getDefault().notify(w).thenAccept(new Consumer<Object>() {
 
 See `webbeans-demo/.../PlanetWizardAction.java` for the panels.
 
+![The New planet wizard](images/wizard.png)
+
+*The demo's two-step planet wizard (`Planets ▸ New planet wizard…`): the step list on the left, the current panel's content, and Back / Next / Finish / Cancel whose enabled state follows `isValid()` of the panels. Dialogs float over the main window and are modal to the session.*
+
 ---
 
 ## 6. Windows in depth
@@ -777,7 +799,15 @@ public final class TasksTopComponent extends TopComponent implements ExplorerMan
 }
 ```
 
+![The Tasks explorer window with the Properties window](images/tutorial-tasks.png)
+
+*`TasksTopComponent` in the explorer mode: an `OutlineView` with the tree column and the `done` property column. The selected node's properties appear in the Properties window on the right — the window system passes the explorer's selection on through the activated-nodes context (§6.4).*
+
 The views find the manager through `ExplorerManager.Provider` on the enclosing window. Swap `OutlineView` for `TreeView` and you have a plain tree (`PartsTopComponent`); `view.setPropertyColumns("size", …, "modified", …)` plus `setSortable(true)` turns `FilesTopComponent` into a sortable file table. Right-click shows `getActions`, double-click runs the node's preferred action (by default: `open()` on an `Openable` in the lookup, as the Workbench's file nodes do; or `setPreferredAction(...)`), F2 renames, Delete destroys — none of which you wrote. `tree.expandNode(n)` expands from code; the view remembers what is expanded (by the user or by you) and restores it after a reconnect or a root change — the Help window's table of contents relies on that.
+
+![Right-click menu on a planet node](images/explorer-popup.png)
+
+*The demo's Planets window with the right-click menu of the Mars node: the node's own `getActions` entries first (`Open`, `Toggle explored`), then the actions registered for the `Planets/Actions` path (`Explore planet`, `Remove planets`), then the standard copy/cut/paste/delete/rename provided by `ExplorerUtils.activateActions`.*
 
 **Pattern — model → nodes → views, never views → views.** The 3D viewer and the Parts tree of the Workbench both show `PartsModel`; selecting in one selects in the other because both listen to the *model's* selection (`PartsModel.setSelected`), not to each other.
 
@@ -857,6 +887,10 @@ The rules:
 
 Per-user settings use `java.util.prefs.Preferences` obtained from `WbPreferences.forModule(YourClass.class)` (stored in the user's data directory, isolated per module). A page in *Tools ▸ Options* is an `OptionsPanelController`:
 
+![The Options dialog](images/options.png)
+
+*`Tools ▸ Options` with the tutorial's page. Every registered `OptionsPanelController` becomes a category on the left; OK / Apply / Cancel call `applyChanges()` / `cancel()` on all of them.*
+
 ```java
 @OptionsPanelController.TopLevelRegistration(categoryName = "#CTL_TutorialOptions", position = 900)
 @Messages({"CTL_TutorialOptions=Tutorial", "LBL_HideDone=Hide finished tasks"})
@@ -915,6 +949,14 @@ public final class SessionSetup implements MainWindowDecorator {
 
 A `Chart` has a type, axes, a legend and a model of series; points are appended or replaced and only the difference travels to the browser. The Workbench dashboard:
 
+![The demo dashboard](images/charts.png)
+
+*The demo's Dashboard window: a 2×2 `Layout.Grid` of charts — a live line chart with two axes and a shaded "storm" band, a bar chart, a donut and a bubble chart on a log axis. The line chart gets one appended point per second; the rest of the page is untouched.*
+
+![A chart in its own window](images/chart-window.png)
+
+*A single chart in a `ChartTopComponent` (`Window ▸ Moons chart`): the toolbar has reset-zoom, save-as-SVG and save-as-PNG plus whatever is registered under `Charts/Actions` (the demo adds an info action); horizontal bars sorted by value with labels at the bar ends.*
+
 ```java
 private final Chart cpu = new Chart(ChartType.LINE);
 private final Chart requests = new Chart(ChartType.BAR);
@@ -956,6 +998,10 @@ Interaction: `addPointClickListener` (the dashboard puts the clicked chart into 
 ## 11. 3D scenes
 
 `Scene3D` is a component whose content is a scene graph of `Node3D`s (groups, meshes, lines, points, labels, lights) with a camera and orbit controls; the browser renders it with three.js and reports picks, hovers, drags and camera moves. `Scene3DTopComponent` wraps it with the viewport toolbar. The Workbench viewer builds a turbine:
+
+![The solar system 3D scene](images/scene3d.png)
+
+*The demo's `Solar system 3D` window: a `Scene3DTopComponent` with the viewport toolbar (fit, reset view, toggle grid, snapshot, plus the actions registered under `Scene3D/Actions`), the orbit camera, labelled spheres on ring orbits and the scene-graph tree on the right. The tree is an ordinary explorer view over `Node3D` nodes, so selection in either side selects in the other.*
 
 ```java
 public ViewerTopComponent() {
@@ -1010,6 +1056,20 @@ private Node3D create(Part p) {
 ```
 
 Animation runs in the browser: `rotor.animate(Animation.rotate(Axis.Z, 1.2))`, `rotor.stopAnimations()`. Selection highlight: `scene.setSelection(Collections.singletonList(node))`. Draggable objects: `probe.setDraggable(DragConstraint.plane(Axis.Y, 0).snap(0.5))` and a `DRAG` listener that may `e.reject()` the end position (the demo's solar system). Your own geometry goes through `Geometry.buffer()` (`Geometries.BLADE`), sent once as a blob; glTF files through `Gltf.load(stream)`. Expose the scene graph as nodes (`Scene3DChildren`) to get a tree and property editing for free. Snapshots: `scene.snapshot(1280, 720)` (bytes), the toolbar's *Save PNG*, or `SnapshotAction` in the Workbench.
+
+---
+
+## 11a. Graphs and maps
+
+Two more windows of the demo show the remaining "big" components; both are documented in full in the Component Guide (§7a `GraphScene`, §7b `MapView`), so this is only a look at what they give you.
+
+![The Deployment graph window](images/graph.png)
+
+*`Window ▸ Deployment graph`: a `GraphTopComponent` over a `GraphScene` — nodes with shapes, pins and an accent bar, edges with orthogonal, curved and direct routers and different anchor shapes, a note, the minimap, the dotted grid, and a toolbar with zoom, fit, auto-layout (`TreeGraphLayout`), save as SVG/PNG and the actions registered under `Graph/Actions`. Users drag nodes, draw edges from a pin or a node handle, rename by double-click and get a popup per node; every change arrives as an event on the server (`webbeans-demo/.../DeploymentTopComponent.java`).*
+
+![The Sites map window](images/map.png)
+
+*`Window ▸ Sites map`: a `MapTopComponent` over a `MapView` with markers, a polyline, a circle and a rectangle on two toggleable layers (`Sites`, `Zones`), the zoom control, the scale bar and a graticule. The base map is a `TileSource` (OpenStreetMap, proxied and cached by the server; shown here with the base map switched off, which is what you also get without internet access). The toolbar has zoom, fit, the draw tools for markers, lines, polygons, rectangles and circles, and the actions registered under `Map/Actions` (`webbeans-demo/.../SitesMapTopComponent.java`).*
 
 ---
 
@@ -1093,6 +1153,10 @@ public static Component user() {
 }
 ```
 
+![The status bar](images/statusbar.png)
+
+*The status bar of the demo: the status text on the left; on the right the signed-in user, the clock, the language switch (`Deutsch` / `English`) and `Sign out` — four `StatusBar` registry cells like the one above (`webbeans-demo/.../DemoStatusCells.java`) — then the platform's own notifications bell and connection indicator.*
+
 Administrators get the `SessionDirectory` service (`getSessions()`, `invalidate(id)`): the Workbench *Server Status* window lists every live session as nodes and its popup ends one. Accounts come from an `AuthenticationProvider` (the built-in properties file, seeded by `WorkbenchInstaller`; LDAP/OAuth providers implement the same interface — see `design/authentication.md`).
 
 ---
@@ -1162,7 +1226,12 @@ The toolbox: `HeadlessUI.start()` (user `alice`, role `user`) or `HeadlessUI.bui
 
 ## 15. Help pages
 
-Users press **F1** in a window, click **Help** in a dialog, or open **Help ▸ Help Contents**; the Help window (its own area on the right) shows a page, with a table of contents, search, Back and *Open in new tab*. A page is a Markdown file in your jar, registered with `@HelpPage` — the tutorial's `package-info.java`:
+Users press **F1** in a window, click **Help** in a dialog, or open **Help ▸ Help Contents**; the Help window (its own area on the right) shows a page, with a table of contents, search, Back and *Open in new tab*.
+
+![The Help window, maximised](images/help.png)
+
+*The Help window showing the tutorial's "Getting around" page (maximised by double-clicking its tab). Contents, Back, the search field and *Open in new tab* are the window's own toolbar; the page is Markdown from the jar, styled with the application theme.*
+ A page is a Markdown file in your jar, registered with `@HelpPage` — the tutorial's `package-info.java`:
 
 ```java
 /** The tutorial of the user's guide — and its help page. */
