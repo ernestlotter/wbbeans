@@ -262,7 +262,7 @@ An `Action` (`org.webbeans.actions`) has a display name, icon, enabled flag, a v
 | Checkbox menu item backed by a user preference | `Actions.checkbox(Module.class, "key", default, onToggle, label)` from a `Presenter.Menu` action (see the Workbench's `SpinAction`) |
 | Full control (own presenter, own enablement) | a public `Action` subclass with a no-arg constructor; implement `Presenter.Menu/Toolbar/Popup` to supply components |
 | Background work | `@ActionRegistration(…, asynchronous = true)`: runs on a `RequestProcessor` with a "Running …" progress handle; use `e.getUI().access(…)` for components |
-| Menu / toolbar / popup placement | `@ActionReference(path = "Menu/File", position = …, separatorBefore/After = …)`, `"Toolbars/File"`, `"<Type>/Actions"` (any folder a node reads with `Actions.forPath`), `Scene3DTopComponent.ACTIONS_FOLDER`, `ChartTopComponent.ACTIONS_FOLDER`, `GraphTopComponent.ACTIONS_FOLDER` |
+| Menu / toolbar / popup placement | `@ActionReference(path = "Menu/File", position = …, separatorBefore/After = …)`, `"Toolbars/File"`, `"<Type>/Actions"` (any folder a node reads with `Actions.forPath`), `Scene3DTopComponent.ACTIONS_FOLDER`, `ChartTopComponent.ACTIONS_FOLDER`, `GraphTopComponent.ACTIONS_FOLDER`, `MapTopComponent.ACTIONS_FOLDER` |
 | Keyboard shortcut | `@ActionReference(path = "Shortcuts", name = "D-S")` (`D` = Ctrl/Cmd, `O` = Alt, `S` = Shift, keys `S`, `F5`, `ENTER`, `DELETE`, `UP`…) |
 | A menu or toolbar of your own | `@FolderRegistration(path = "Toolbars/File", displayName = "#CTL_FileToolbar", position = 100)` on any class |
 | Keep the last selection when a window without one is activated | `surviveFocusChange = true` (the Workbench's Save stays enabled while you look at the Files window) |
@@ -410,6 +410,14 @@ scene.addListener(Scene3D.PICK, e -> { scene.setSelection(e.getNode()); status(e
 
 ---
 
+## 12b. Maps
+
+`MapView` (`org.webbeans.map`) is a slippy map whose overlays live on the server — markers, lines, polygons, circles in metres, rectangles, georeferenced images, GeoJSON, popups, grouped into layers the user toggles — with the browser reporting view changes, clicks (with the overlay or GeoJSON feature hit), hovers, marker drags and finished drawings (the five draw modes). Tiles are served **through the server**: `TileSource.OSM` is proxied and cached on disk (`/wb/tiles/…`, a `ContentProvider`), which keeps the Content Security Policy strict and works on intranets whose browsers have no internet route; `TileSource.directory` serves a local tile folder for air-gapped sites, `TileSource.direct` loads from the provider when you allow its origin with `ServerConfig.imageSources`, and `TileSource.BLANK` draws a graticule. `MapTopComponent` adds the toolbar (zoom, show everything, draw tools, `Map/Actions`). Component guide §7b has the API; the demo's *Sites map* window (`SitesMapTopComponent`) uses most of it.
+
+`ContentProvider` (`org.webbeans.ui`) is the general mechanism behind the tile endpoint: a binary counterpart of `PageProvider`, served under a prefix to signed-in users on the HTTP thread (thread-safe, may block) — register one with `@ServiceProvider(service = ContentProvider.class)` for any bytes your components need to load by URL.
+
+---
+
 ## 13. Writing your own component
 
 When a built-in component does not fit, write one: a Java class and a JavaScript renderer.
@@ -478,7 +486,7 @@ Everything that touches components runs through `h.run(...)` (the session execut
 - Lower-level: a `UI` with a recording `Transport` (`UITest`, `ExplorerTest`, `ChartTest`, `Scene3DTest`); window system tests with a `Registry` built from a `RegistrationBuilder` (`WindowManagerTest`); dialogs answered by clicking their buttons (`DialogsTest`); the help system end to end on `HeadlessUI` (`HelpTest`: registry → table of contents, display, F1, dialog buttons, search, the stand-alone page, re-expansion after a restore).
 - `MockServices.setServices(FakeFileService.class)` swaps services in `Lookup.getDefault()` for a test; `WbDefaultLookup.getInstance().setContent(...)` replaces the whole default lookup (HeadlessUI restores it on close).
 - Registry and platform tests can build real jars at test time (`TestJars` in `webbeans-core`'s tests), put them in a `URLClassLoader` and run `Platform.start` against it and a temp data directory.
-- Server tests: `WbServerTest` starts the real Jetty server on port 0 and speaks the protocol over long polling (`HttpURLConnection`) and over a WebSocket (Jetty's `WebSocketClient`); `webbeans-demo/e2e/*.js` (`transport.js` covers the WebSocket, the outage/replay path and the long-poll fallback; `graph.js` the graph scene), `webbeans-tutorial/e2e/tutorial.js`, `workbench/e2e/workbench.js` and `workbench/e2e/help.js` drive Chromium with Playwright (headless WebGL through SwiftShader) through the dock, the explorer, the menus, dialogs, charts, 3D, options, help, persistence, reconnect and roles.
+- Server tests: `WbServerTest` starts the real Jetty server on port 0 and speaks the protocol over long polling (`HttpURLConnection`) and over a WebSocket (Jetty's `WebSocketClient`); `webbeans-demo/e2e/*.js` (`transport.js` covers the WebSocket, the outage/replay path and the long-poll fallback; `graph.js` the graph scene, `map.js` the map), `webbeans-tutorial/e2e/tutorial.js`, `workbench/e2e/workbench.js` and `workbench/e2e/help.js` drive Chromium with Playwright (headless WebGL through SwiftShader) through the dock, the explorer, the menus, dialogs, charts, 3D, options, help, persistence, reconnect and roles.
 
 ---
 

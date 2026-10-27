@@ -106,6 +106,12 @@ public final class AppHandler extends HttpServlet {
         } else if (path.equals("/favicon.ico")) {
             r.sendEmpty(204);
         } else {
+            for (org.webbeans.ui.ContentProvider p : Lookup.getDefault().lookupAll(org.webbeans.ui.ContentProvider.class)) {
+                if (path.startsWith(p.getPrefix())) {
+                    providerContent(r, p, path.substring(p.getPrefix().length()));
+                    return;
+                }
+            }
             for (PageProvider p : Lookup.getDefault().lookupAll(PageProvider.class)) {
                 if (path.startsWith(p.getPrefix())) {
                     providerPage(r, p, path.substring(p.getPrefix().length()));
@@ -113,6 +119,32 @@ public final class AppHandler extends HttpServlet {
                 }
             }
         }
+    }
+
+    /** A module endpoint ({@code /wb/tiles/...}): signed-in users only, served on this thread. */
+    private void providerContent(WbRequest r, org.webbeans.ui.ContentProvider p, String sub) throws IOException {
+        HttpSession s = auth.currentSession(r);
+        if (s == null) {
+            r.sendText(401, "Not authenticated");
+            return;
+        }
+        s.touch();
+        org.webbeans.ui.ContentProvider.Content c;
+        try {
+            c = p.get(s.getUISession(), sub, r.getQuery());
+        } catch (IOException e) {
+            LOG.log(Level.WARNING, "Content provider " + p.getPrefix() + " failed for " + sub + ": " + e);
+            r.sendText(502, "Upstream failure");
+            return;
+        }
+        if (c == null) {
+            r.sendText(404, "Not found");
+            return;
+        }
+        if (c.getCacheControl() != null) {
+            r.setHeader("Cache-Control", c.getCacheControl());
+        }
+        r.send(200, c.getContentType(), c.getBytes());
     }
 
     /** A module page ({@code /wb/help/...}): signed-in users only, rendered on the session executor. */

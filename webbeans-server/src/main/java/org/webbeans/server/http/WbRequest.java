@@ -267,8 +267,12 @@ public final class WbRequest {
     }
 
     public void sendHtml(int status, String html) throws IOException {
+        StringBuilder img = new StringBuilder("img-src 'self' data: blob:");
+        for (String src : config.getImageSources()) {
+            img.append(' ').append(src);
+        }
         response.setHeader("Content-Security-Policy",
-                "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'");
+                "default-src 'self'; " + img + "; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'");
         response.setHeader("X-Frame-Options", "DENY");
         send(status, "text/html; charset=utf-8", html);
     }

@@ -23,6 +23,7 @@
     <module>webbeans-nodes</module>
     <module>webbeans-charts</module>
     <module>webbeans-graph</module>
+    <module>webbeans-map</module>
     <module>webbeans-scene3d</module>
     <module>webbeans-test</module>
     <module>webbeans-help</module>
@@ -111,6 +112,11 @@
       <dependency>
         <groupId>org.webbeans</groupId>
         <artifactId>webbeans-graph</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.webbeans</groupId>
+        <artifactId>webbeans-map</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>

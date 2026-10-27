@@ -1,4 +1,4 @@
-# WebBeans — Architecture Design v0.10
+# WebBeans — Architecture Design v0.11
 
 A rich web application platform modelled on the NetBeans Platform. All application code — UI definition, business logic — is server-side Java (JDK 8) on the class path. The browser runs a thin, generated JavaScript runtime that mirrors the server-side component tree.
 
@@ -26,7 +26,7 @@ Document map: `design/README.md` lists every design document and the developer d
 │ Application jars (user code)                             │
 ├──────────────────────────────────────────────────────────┤
 │ Platform APIs: Window System · Explorer/Nodes · Actions  │
-│                Options · Dialogs · Charts · Graph · Scene3D│
+│                Options · Dialogs · Charts · Graph · Map · 3D│
 ├──────────────────────────────────────────────────────────┤
 │ UI Core: Component tree · Properties · Events · Deltas   │
 │          Standard component library                      │
@@ -120,7 +120,7 @@ public abstract class Container extends Component { children(); add(); add(c, co
 
 - Every component has a UI-unique `id`; properties are declared statically (`Property.of("text", String.class, "")`) so renderers and protocol stay type-safe. Properties may be `clientOwned()` (text field value, scroll position) and events `lazy()` (debounced on the client).
 - Mutations append to the UI's `DeltaBuffer`; a flush after each executor task sends one batched message.
-- **Standard library** (`webbeans-ui`): basic — `Label`, `Button`, `ToggleButton`, `SplitButton`, `TextField`, `TextArea`, `PasswordField`, `NumberField`, `CheckBox`, `RadioGroup`, `ButtonGroup`, `ComboBox` (lazy items), `DatePicker`/`DateTimePicker`/`TimePicker`, `ColorPicker`, `TagInput`, `Slider`, `Link`, `Image`, `ProgressBar`, `Html`, `Upload`, `Spacer`, `Badge`, `Chip`, `Avatar`, `EmptyState`, `Breadcrumb`, `Stepper`; layout — `Panel` (with a busy overlay) with `BorderLayout`, `FlowLayout`, `GridLayout`, `FormLayout`, `StackLayout`, `FillLayout`, `SplitPane`, `TabbedPane`, `ScrollPane`, `Card`, `Accordion`, `Popover`, `Toolbar`; data — `Table` (virtualised, keyed row deltas, `ListTableModel`/`LazyTableModel`, inline editing), `TreeTable`, `PropertyGrid`, `ListBox`, `Tree`; text — `CodeEditor`, `MarkdownEditor`, `DiffView`, `OutputView`; boards and viewers — `Calendar`, `Kanban`, `Diagram` + `Palette`, `ImageViewer`, `PdfViewer`; plus `DownloadService` for file downloads, a `Form` helper for validation and `EnumLabels`/`Labeled` for how enum values are shown everywhere. Platform modules add `TreeView`, `OutlineView`, `ListView`, `PropertySheet`, `NodeComboBox`, menus/toolbars/popups, Quick Search, `Dialog`, `Chart`, `GraphScene` (Visual Library style graphs, `design/graph.md`), `Scene3D`.
+- **Standard library** (`webbeans-ui`): basic — `Label`, `Button`, `ToggleButton`, `SplitButton`, `TextField`, `TextArea`, `PasswordField`, `NumberField`, `CheckBox`, `RadioGroup`, `ButtonGroup`, `ComboBox` (lazy items), `DatePicker`/`DateTimePicker`/`TimePicker`, `ColorPicker`, `TagInput`, `Slider`, `Link`, `Image`, `ProgressBar`, `Html`, `Upload`, `Spacer`, `Badge`, `Chip`, `Avatar`, `EmptyState`, `Breadcrumb`, `Stepper`; layout — `Panel` (with a busy overlay) with `BorderLayout`, `FlowLayout`, `GridLayout`, `FormLayout`, `StackLayout`, `FillLayout`, `SplitPane`, `TabbedPane`, `ScrollPane`, `Card`, `Accordion`, `Popover`, `Toolbar`; data — `Table` (virtualised, keyed row deltas, `ListTableModel`/`LazyTableModel`, inline editing), `TreeTable`, `PropertyGrid`, `ListBox`, `Tree`; text — `CodeEditor`, `MarkdownEditor`, `DiffView`, `OutputView`; boards and viewers — `Calendar`, `Kanban`, `Diagram` + `Palette`, `ImageViewer`, `PdfViewer`; plus `DownloadService` for file downloads, a `Form` helper for validation and `EnumLabels`/`Labeled` for how enum values are shown everywhere. Platform modules add `TreeView`, `OutlineView`, `ListView`, `PropertySheet`, `NodeComboBox`, menus/toolbars/popups, Quick Search, `Dialog`, `Chart`, `GraphScene` (Visual Library style graphs, `design/graph.md`), `MapView` (slippy map with server-side overlays, `design/map.md`), `Scene3D`.
 - Client-side-only interaction (hover, drag-preview, typing) does not round-trip; only semantic events (`click`, `change`, `select`, `expand`, `drop`) are sent, and only for types the server has registered a listener for.
 
 Detailed design: `design/standard-components.md`; usage: `docs/component-guide.md`.
@@ -266,6 +266,7 @@ Detailed design: `design/scene3d.md`.
 
 ## 19. Change log
 
+- v0.11 — step 17: `webbeans-map` — `MapView` (tiles through the server, overlays, drawing; `design/map.md`); `ContentProvider` SPI and `ServerConfig.imageSources`.
 - v0.10 — step 16: `webbeans-graph` — `GraphScene` after the NetBeans Visual Library (object↔widget mapping, pins, anchors, routers, notes, layouts, SVG renderer); `design/graph.md`.
 - v0.9 — step 15: i18n lookup in `Bundles` (NetBeans file conventions, no `NbBundle` at run time); `@Messages` defaults in `Bundle-generated.properties` merged with hand-written `Bundle*.properties` at run time, so the processor never overwrites a developer's file whatever the build's resource-copy order.
 - v0.8 — step 14: the module system is removed; the application is the class path (§3 rewritten: discovery through `META-INF/services`, `Installer` hooks, no isolation or versions); step 13's HTTPS recorded, its run-time module loading withdrawn with the module system.

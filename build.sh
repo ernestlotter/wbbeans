@@ -154,6 +154,10 @@ GRAPH_CP="$OUT/webbeans-actions.jar:$OUT/webbeans-windows.jar:$OUT/webbeans-ui.j
 build_module webbeans-graph "$GRAPH_CP" "$APROCS -Awebbeans.module=org.webbeans.graph"
 test_module  webbeans-graph "$OUT/webbeans-graph.jar:$GRAPH_CP" "-proc:none"
 
+MAP_CP="$OUT/webbeans-actions.jar:$OUT/webbeans-windows.jar:$OUT/webbeans-ui.jar:$UI_CP"
+build_module webbeans-map "$MAP_CP" "$APROCS -Awebbeans.module=org.webbeans.map"
+test_module  webbeans-map "$OUT/webbeans-map.jar:$MAP_CP" "-proc:none"
+
 SCENE3D_CP="$OUT/webbeans-nodes.jar:$OUT/webbeans-actions.jar:$OUT/webbeans-windows.jar:$OUT/webbeans-ui.jar:$UI_CP"
 build_module webbeans-scene3d "$SCENE3D_CP" "$APROCS -Awebbeans.module=org.webbeans.scene3d"
 test_module  webbeans-scene3d "$OUT/webbeans-scene3d.jar:$SCENE3D_CP" "-proc:none"
@@ -172,7 +176,7 @@ test_module  webbeans-server "$OUT/webbeans-server.jar:$SERVER_CP:$JETTY_CLIENT_
 LAUNCHER_CP="$OUT/webbeans-server.jar:$SERVER_CP"
 build_module webbeans-launcher "$LAUNCHER_CP" "-proc:none"
 
-DEMO_CP="$OUT/webbeans-help.jar:$OUT/webbeans-scene3d.jar:$OUT/webbeans-graph.jar:$OUT/webbeans-charts.jar:$OUT/webbeans-nodes.jar:$OUT/webbeans-actions.jar:$OUT/webbeans-windows.jar:$OUT/webbeans-ui.jar:$UI_CP"
+DEMO_CP="$OUT/webbeans-help.jar:$OUT/webbeans-scene3d.jar:$OUT/webbeans-map.jar:$OUT/webbeans-graph.jar:$OUT/webbeans-charts.jar:$OUT/webbeans-nodes.jar:$OUT/webbeans-actions.jar:$OUT/webbeans-windows.jar:$OUT/webbeans-ui.jar:$UI_CP"
 build_module webbeans-demo "$DEMO_CP" "$APROCS -Awebbeans.module=org.webbeans.demo"
 
 # the tutorial module of docs/user-guide.md (built and tested like any application module)
@@ -180,7 +184,7 @@ build_module webbeans-tutorial "$DEMO_CP" "$APROCS -Awebbeans.module=org.webbean
 test_module webbeans-tutorial "$OUT/webbeans-tutorial.jar:$OUT/webbeans-test.jar:$DEMO_CP" "-proc:none"
 
 # ---- the Workbench sample application -------------------------------------------------------------------------
-WB_CP="$OUT/webbeans-help.jar:$OUT/webbeans-scene3d.jar:$OUT/webbeans-graph.jar:$OUT/webbeans-charts.jar:$OUT/webbeans-nodes.jar:$OUT/webbeans-actions.jar:$OUT/webbeans-windows.jar:$OUT/webbeans-ui.jar:$UI_CP"
+WB_CP="$OUT/webbeans-help.jar:$OUT/webbeans-scene3d.jar:$OUT/webbeans-map.jar:$OUT/webbeans-graph.jar:$OUT/webbeans-charts.jar:$OUT/webbeans-nodes.jar:$OUT/webbeans-actions.jar:$OUT/webbeans-windows.jar:$OUT/webbeans-ui.jar:$UI_CP"
 build_module workbench/workbench-core "$WB_CP" "$APROCS -Awebbeans.module=org.webbeans.workbench.core"
 WBCORE="$OUT/workbench/workbench-core.jar"
 for m in files dashboard viewer3d admin; do
@@ -199,7 +203,7 @@ for m in core files dashboard viewer3d admin; do [ -f "$OUT/workbench/workbench-
 mkdir -p "$OUT/workbench-dist"
 # shellcheck disable=SC2086
 python3 tools/fatjar.py "$OUT/workbench-dist/workbench.jar" \
-  --lib "$LIB/org-openide-util-lookup.jar" "$LIB/org-openide-util.jar" $(for j in $JETTY_JARS; do echo "$LIB/$j"; done) $(for m in core auth ui windows actions nodes help charts graph scene3d server launcher; do echo "$OUT/webbeans-$m.jar"; done) $WBJARS \
+  --lib "$LIB/org-openide-util-lookup.jar" "$LIB/org-openide-util.jar" $(for j in $JETTY_JARS; do echo "$LIB/$j"; done) $(for m in core auth ui windows actions nodes help charts graph map scene3d server launcher; do echo "$OUT/webbeans-$m.jar"; done) $WBJARS \
   --resources workbench/workbench-app/src/main/resources
 cp workbench/workbench-app/workbench.sh "$OUT/workbench-dist/"
 
@@ -207,7 +211,7 @@ cp workbench/workbench-app/workbench.sh "$OUT/workbench-dist/"
 rm -rf "$OUT/dist"; mkdir -p "$OUT/dist/lib"
 cp "$LIB/org-openide-util-lookup.jar" "$LIB/org-openide-util.jar" "$OUT/dist/lib/"
 for j in $JETTY_JARS; do cp "$LIB/$j" "$OUT/dist/lib/"; done
-for m in core auth ui windows actions nodes help charts graph scene3d test server launcher demo tutorial; do cp "$OUT/webbeans-$m.jar" "$OUT/dist/lib/"; done
+for m in core auth ui windows actions nodes help charts graph map scene3d test server launcher demo tutorial; do cp "$OUT/webbeans-$m.jar" "$OUT/dist/lib/"; done
 
 echo "== OK: $(ls "$OUT"/*.jar | xargs -n1 basename | tr '\n' ' ')"
 echo "run:  $JAVA_BIN -cp '$OUT/dist/lib/*' org.webbeans.launcher.Main --datadir data --port 8080"

@@ -757,6 +757,33 @@ Scene: `setSelectionMode(NONE, SINGLE, MULTI)`, `setGrid`, `setShowGrid`, `setRo
 
 ---
 
+## 7b. Maps — `MapView` (`org.webbeans.map`)
+
+A slippy map with server-owned overlays. Tiles come **through the server** (`TileSource.OSM` is proxied and cached under `<datadir>/system/tiles`; `TileSource.directory` serves a local `z/x/y` folder; `TileSource.direct` needs `ServerConfig.imageSources(origin)`; `TileSource.BLANK` draws a graticule).
+
+```java
+MapView map = new MapView(TileSource.OSM);
+map.setView(LatLng.of(-42.88, 147.33), 11);
+map.addLayer("sites", "Sites");
+map.addMarker("hq", hq).setLabel("HQ").setColor("#b43b3b").setDraggable(true).setLayer("sites");
+map.addPolyline("route", path).setWeight(3).setArrow(true);
+map.addCircle("range", hq, 2500).setColor("#0f7f86").setFillOpacity(0.1).setInteractive(false);
+map.addPolygon("zone", ring).setFillColor("#b43b3b").addHole(hole);
+map.addImage("plan", bounds).setImageUrl("/wb/blob/" + blobId).setOpacity(0.6);
+map.addGeoJson("stations", geoJsonText).setPointsAsCircles(true).setLabelProperty("name");  // properties.style per feature
+map.addMapClickListener(e -> { if (e.getOverlay() instanceof Marker) map.openPopup(e.getPosition(), "<b>" + label + "</b>"); });
+map.addDragListener(e -> save(((Marker) e.getOverlay()).getPosition()));
+map.addViewListener(e -> status(e.getCenter() + " z" + e.getZoom()));          // lazy; e.getBounds()
+map.setDrawMode(MapView.DrawMode.POLYGON);                                     // or the MapTopComponent toolbar
+map.addDrawListener(e -> map.addPolygon("area" + n++, e.getPoints()));
+map.fitOverlays(40);
+new MapTopComponent(map);                                                      // toolbar + Map/Actions
+```
+
+Overlays: `Marker` (`setIcon`, `setIconSize`, `setIconAnchor`, `setLabel`, `setColor`, `setDraggable`, `setRotation`), `Polyline` (`setArrow`, `getLength`), `Polygon` (`addHole`, `getArea`), `Circle` (metres), `Rectangle`, `ImageOverlay`, `GeoJsonOverlay`, `Popup` (`setHtml` sanitised, `setText`, `setOpen`); all with `setVisible/Opacity/Tooltip/StyleName/Layer/ZIndex/Interactive/Attribute`, vector ones with `setColor/Weight/Dash/FillColor/FillOpacity/Fill`. Map: `setView`, `panTo`, `setZoom`, `fitBounds`, `setZoomRange`, `setMaxBounds`, `setInteractive`, `setZoomControl`, `setScaleBar`, `setLayerControl`, `setAttribution`, `openPopup`, `closePopups`, `getOverlayBounds`. Events: `VIEW`, `CLICK` (`getOverlay`, `getFeature`, `getFeatureId`, `getPosition`), `DOUBLE_CLICK`, `HOVER`, `MENU`, `DRAG`, `DRAW` (`getMode`, `getPoints`, `getBounds`, `getRadius`), `LAYER_TOGGLE`. `Geo` has `distance`, `bearing`, `destination`, `area`, `length`, `project/unproject`.
+
+---
+
 ## 8. Scene3D
 
 ```java

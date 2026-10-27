@@ -12,6 +12,7 @@ public final class ServerConfig {
     private String host = "0.0.0.0";
     private int port = 8080;
     private String contextPath = "";
+    private final java.util.List<String> imageSources = new java.util.ArrayList<String>();
     private String applicationTitle = "WebBeans";
     private boolean devMode;
     private boolean secureCookies;
@@ -56,6 +57,24 @@ public final class ServerConfig {
     /** Prefix under which the application is served, {@code ""} for the root; no trailing slash. */
     public String getContextPath() {
         return contextPath;
+    }
+
+    /**
+     * Extra origins the browser may load images from ({@code img-src} of the Content Security Policy), e.g.
+     * {@code "https://*.tile.openstreetmap.org"} for a map's direct tile source. Default: the server itself only,
+     * which is why map tiles are proxied through {@code /wb/tiles/} unless an origin is listed here.
+     */
+    public ServerConfig imageSources(String... origins) {
+        for (String o : origins) {
+            if (o != null && !o.trim().isEmpty() && !imageSources.contains(o.trim())) {
+                imageSources.add(o.trim());
+            }
+        }
+        return this;
+    }
+
+    public java.util.List<String> getImageSources() {
+        return java.util.Collections.unmodifiableList(imageSources);
     }
 
     public ServerConfig contextPath(String cp) {
